@@ -1,6 +1,6 @@
 # Chat Demo
 
-Chat Demo is a single-module native Android project for an offline conversation between two fixed demo users, Nikita and Sarah. The app currently opens a Material 3 screen showing the app name. The local data layer supports reading and writing messages through a repository.
+Chat Demo is a single-module native Android project for an offline conversation between two fixed demo users, Nikita and Sarah. The app currently opens a Material 3 placeholder. A presentation layer prepares the Room-backed conversation and holds an in-memory draft for the future chat screen.
 
 ## Build and test
 
@@ -9,11 +9,11 @@ Use Android Studio or the Gradle wrapper with JDK 25 and Android SDK 37. The min
 The project uses Compose BOM 2026.09.00 with compile SDK 37.0. The newer stable BOM 2026.11.01 requires compile SDK 37.1 or later.
 
 ```powershell
-.\gradlew.bat assembleDebug testDebugUnitTest lintDebug assembleDebugAndroidTest
+.\gradlew.bat verifyProject
 .\gradlew.bat connectedDebugAndroidTest
 ```
 
-On macOS or Linux, use `./gradlew` in place of `.\gradlew.bat`. The connected tests require a running emulator or connected device. To open the app, select a device and run the `app` configuration in Android Studio.
+The fast gate runs ktlint, Detekt, Android Lint, JVM tests, and debug assembly. It checks formatting without changing source files. Detekt runs the stable CLI against handwritten Kotlin with its own compiler and without type resolution. On macOS or Linux, use `./gradlew` in place of `.\gradlew.bat`. The connected tests require a running emulator or connected device. To open the app, select a device and run the `app` configuration in Android Studio.
 
 ## Architecture
 
@@ -38,12 +38,20 @@ On first creation, the database inserts both users, their conversation and membe
 
 `demoChat` supplies the fixed conversation and participant identities. `observeMessages(conversationId)` exposes a `Flow<List<Message>>` backed by Room. The suspending `sendMessage(NewMessage)` accepts nonblank text from either participant, uses the injected clock, and returns the stored record with its generated ID. SQLite enforces membership and write failures propagate to the caller.
 
+### Chat presentation
+
+A Hilt-injected `ChatViewModel` exposes a read-only `StateFlow` with loading, content, or unavailable history and an in-memory draft. It shares one repository observation for the ViewModel lifetime. Editing the draft preserves the input verbatim and reuses the mapped timeline.
+
+The pure Kotlin mapper keeps repository order and uses message IDs as the basis for stable bubble and section keys. Consecutive messages from the same sender group when less than 20 seconds apart. The first message and any gap greater than one hour start a time section. Section labels use a caller-supplied locale and time zone, so they can update after a configuration change.
+
 ## Testing
 
-JUnit runs local JVM and Android instrumentation tests. The data integration tests use real Room databases, including in-memory databases for isolated tests and temporary files for reopen and rollback cases. They cover sender constraints, chronological ordering, observable updates, clock-based timestamps, seed data, and persistence. Tests use deterministic clocks and bounded waits for Flow emissions.
+JVM tests cover timeline boundaries, authorship, stable keys, time labels, and ViewModel transitions using a controlled coroutine scheduler. Data integration tests use real Room databases and cover sender constraints, chronological ordering, observable updates, clock-based timestamps, seed data, and persistence.
 
 ## Assumptions and limits
 
-The demo is local to a single installation. The intended conversation has exactly two fixed participants. Timestamps are stored at millisecond precision, with generated IDs providing deterministic ordering within the same millisecond.
+The demo is local to a single installation. The intended conversation has exactly two fixed participants. Timestamps are stored at millisecond precision, with generated IDs providing deterministic ordering within the same millisecond. Moving the device clock backwards can place new messages earlier in the timeline.
 
-The launch screen does not display the conversation. Message composition, ViewModel state, and automatic replies are outside the current implementation. There is no account, network delivery, or synchronization. Screenshot testing has not been configured.
+The app disables Android Auto Backup and explicitly excludes its database directory from legacy backup, cloud backup, and Android device-to-device transfer where the platform applies those rules. Device makers can handle transfer differently. [Android backup behavior](https://developer.android.com/identity/data/autobackup)
+
+The launch screen is a placeholder. Rendering the conversation, sending from the UI, automatic replies, draft persistence, and screenshot testing are future work. The demo has no account, network delivery, or synchronization.
