@@ -13,6 +13,14 @@ A standalone native Android chat demo for two fixed users. Kotlin, Jetpack Compo
 - Preserve unrelated user changes. Never force-push, publish, or push without explicit authorization. Do not commit credentials, local settings, private requirements, internal AI transcripts, or supplied third-party reference assets.
 - Keep working notes, plans and task reports in ignored `_workspace/` (if a tool requires another output location, ensure it is also excluded before creating/committing). Public documentation describes the standalone project; do not include third-party assignment/company names, original reference text, logos, or private correspondence.
 
+## Development quality
+
+- Maintain zero Android Lint errors and zero unjustified warnings. Resolve actionable warnings introduced or encountered during implementation. Document the technical reason for every warning intentionally retained or suppressed.
+- Remove unused imports, dead code, unused resources, and unnecessary dependencies. Prefer stable, non-deprecated APIs.
+- Keep dependencies stable and mutually compatible. Review and document deliberate version pins, and keep unrelated upgrades out of feature work.
+- Update README.md after every task that introduces meaningful functionality, architecture decisions, or limitations. Record intentional trade-offs and limitations as the implementation progresses.
+- Include these standards in subsequent code reviews.
+
 ## Architecture guidelines
 - Room is the single source of truth for persisted messages; no independent mutable message list in presentation state.
 - Use domain models independent of Android/Room; use Kotlin inline value classes for meaningful domain IDs, mapping to Room-compatible primitive types at persistence boundaries when appropriate.
