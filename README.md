@@ -22,13 +22,13 @@ Open and sync the project in Android Studio Quail 2 or newer, then wait for inde
 ```powershell
 android --version
 android studio check
+android studio open-file --project=ChatDemo app/src/main/java/com/biggemott/chatdemo/ui/chat/ReplyDelay.kt
 android studio analyze-file --project=ChatDemo app/src/main/java/com/biggemott/chatdemo/ui/chat/ReplyDelay.kt
-git ls-files -- '*.kt' '*.kts' 'app/src/*.xml' | ForEach-Object {
-    android studio analyze-file --project=ChatDemo $_
-}
 ```
 
-For a task check, pass the changed files individually. The loop covers the tracked handwritten Kotlin, Gradle Kotlin DSL, and XML files. Check each reported path and diagnostic even when the exit code is zero. After external edits, reopen the file and wait for IDE highlighting before retrying. On first use or after a tool upgrade, temporarily change `delay(duration)` to `delay(duration.inWholeMilliseconds)` in `ReplyDelay.kt`, confirm the legacy-overload diagnostic, then undo only that change. If the probe fails, use Android Studio's **Inspect Code** action on the same source scope and report any coverage gaps. The inspection runs separately from `verifyProject`.
+Run `analyze-file` for each changed Kotlin, Gradle Kotlin DSL, or Android XML file, including tests. Check the returned path and findings. After external edits, open another project file with `open-file`, reopen the target with the same command, and allow highlighting to settle before retrying. The `Done` response only confirms the open request.
+
+On first use or after an upgrade, verify a known diagnostic before relying on the scan. In `ReplyDelay.kt`, temporarily replace `delay(duration)` with `delay(duration.inWholeMilliseconds)` and check for the legacy-overload warning. Undo only the probe edit, reopen, and confirm the warning disappears. A missed probe, a diagnostic about text that has already changed, or a result for the wrong path makes that run unverified. Retry after reopening and record any unresolved gaps. A zero exit or empty result alone provides no freshness or inspection-coverage guarantee. The CLI reports per-file diagnostics from the running IDE. It provides neither an inspection execution trace nor complete project-wide coverage. This check runs separately from `verifyProject`.
 
 ## Architecture
 
