@@ -7,7 +7,6 @@ import com.biggemott.chatdemo.domain.DemoChat
 import com.biggemott.chatdemo.domain.Message
 import com.biggemott.chatdemo.domain.NewMessage
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -79,6 +78,11 @@ class ChatViewModel
             }
         }
 
+        override fun onCleared() {
+            // A reply cancelled before launch never enters its finally block.
+            mutableUiState.update { it.copy(isReplyPending = false) }
+        }
+
         fun onDraftChanged(text: String) {
             if (text == mutableUiState.value.draft) return
             draftRevision++
@@ -135,15 +139,16 @@ class ChatViewModel
             }
         }
 
-        // Called while holding writeMutex, so a cancelled reply can only be delaying or waiting for the lock.
+        // Holding writeMutex lets us cancel the previous reply before it enters its write.
         private fun replaceReply() {
             val generation = ++replyGeneration
             replyJob?.cancel()
+            val duration = replyDelay.nextDuration()
             mutableUiState.update { it.copy(isReplyPending = true) }
             replyJob =
-                viewModelScope.launch(start = CoroutineStart.UNDISPATCHED) {
+                viewModelScope.launch {
                     try {
-                        replyDelay.await()
+                        replyDelay.await(duration)
                         writeMutex.withLock {
                             val reply = NewMessage(chat.conversation.id, chat.otherUser.id, scriptedReplies[replyIndex])
                             if (persist(reply) != null) {

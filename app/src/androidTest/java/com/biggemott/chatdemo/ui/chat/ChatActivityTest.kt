@@ -44,12 +44,19 @@ import org.junit.runner.RunWith
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneOffset
+import kotlin.time.Duration
 
 @RunWith(AndroidJUnit4::class)
 class ChatActivityTest {
     private val compose = createAndroidComposeRule<ComponentActivity>()
     private val clock = Clock.fixed(Instant.parse("2026-05-14T14:29:00Z"), ZoneOffset.UTC)
     private val releaseReply = CompletableDeferred<Unit>()
+    private val replyDelay =
+        object : ReplyDelay {
+            override fun nextDuration(): Duration = Duration.ZERO
+
+            override suspend fun await(duration: Duration) = releaseReply.await()
+        }
     private lateinit var database: ChatDatabase
     private lateinit var repository: RoomChatRepository
 
@@ -141,7 +148,7 @@ class ChatActivityTest {
     private fun render(): ChatViewModel {
         lateinit var viewModel: ChatViewModel
         compose.activityRule.scenario.onActivity { activity ->
-            val factory = viewModelFactory { initializer { ChatViewModel(repository, ReplyDelay { releaseReply.await() }) } }
+            val factory = viewModelFactory { initializer { ChatViewModel(repository, replyDelay) } }
             viewModel = ViewModelProvider.create(activity, factory)[ChatViewModel::class]
             activity.setContent {
                 ChatDemoTheme { ChatRoute(viewModel, onBack = {}) }

@@ -14,7 +14,6 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -35,6 +34,7 @@ import org.junit.Test
 import java.io.IOException
 import java.time.Instant
 import kotlin.random.Random
+import kotlin.time.Duration.Companion.milliseconds
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class ChatMessageFlowTest {
@@ -55,7 +55,7 @@ class ChatMessageFlowTest {
                         repository,
                         ReplyDelay {
                             delaySelections++
-                            delay(delays.removeFirstOrNull() ?: 1_000)
+                            (delays.removeFirstOrNull() ?: 1_000).milliseconds
                         },
                     )
                 }
@@ -133,6 +133,24 @@ class ChatMessageFlowTest {
         }
 
     @Test
+    fun rapidSuccessfulWritesEachSelectADelayAndOnlyTheLastReplies() =
+        runTest {
+            delays.addAll(listOf(1_000L, 3_000L))
+            send("First")
+            send("Second")
+            runCurrent()
+
+            assertEquals(listOf("First", "Second"), repository.written.map { it.text })
+            assertEquals(2, delaySelections)
+            advanceTimeBy(2_999)
+            runCurrent()
+            assertTrue(repository.replies.isEmpty())
+            advanceTimeBy(1)
+            runCurrent()
+            assertEquals(listOf(scriptedReplies.first()), repository.replies.map { it.text })
+        }
+
+    @Test
     fun aSendHoldingTheWriteAtTheDeadlineSupersedesTheOldReplyOnlyOnSuccess() =
         runTest {
             val persist = CompletableDeferred<Unit>()
@@ -200,6 +218,23 @@ class ChatMessageFlowTest {
             advanceTimeBy(3_000)
             runCurrent()
             assertEquals(listOf("First"), repository.written.map { it.text })
+        }
+
+    @Test
+    fun clearingBeforeTheQueuedReplyStartsEndsTypingWithoutWritingAReply() =
+        runTest {
+            send("First")
+            launch(dispatcher) {
+                assertEquals(1, delaySelections)
+                assertTrue(viewModel.uiState.value.isReplyPending)
+                store.clear()
+            }
+            runCurrent()
+            advanceTimeBy(3_000)
+            runCurrent()
+
+            assertEquals(listOf("First"), repository.written.map { it.text })
+            assertFalse(viewModel.uiState.value.isReplyPending)
         }
 
     @Test
@@ -340,8 +375,8 @@ class ChatMessageFlowTest {
 
                 override fun nextBits(bitCount: Int): Int = error("Use the bounded draw")
             }
-        assertEquals(1_000L, randomReplyDelayMillis(endpoints))
-        assertEquals(3_000L, randomReplyDelayMillis(endpoints))
+        assertEquals(1_000.milliseconds, randomReplyDelay(endpoints))
+        assertEquals(3_000.milliseconds, randomReplyDelay(endpoints))
     }
 
     private fun send(text: String) {
