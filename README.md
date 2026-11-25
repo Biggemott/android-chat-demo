@@ -15,6 +15,21 @@ The project uses Compose BOM 2026.09.00 with compile SDK 37.0. The newer stable 
 
 The fast gate runs ktlint, Detekt, Android Lint, JVM tests including screenshot comparisons, and debug assembly. It checks formatting without changing source files. Detekt runs the stable CLI against handwritten Kotlin with its own compiler and without type resolution. On macOS or Linux, use `./gradlew` in place of `.\gradlew.bat`. The connected tests require a running emulator or connected device. To open the app, select a device and run the `app` configuration in Android Studio.
 
+### Optional local IDE inspections
+
+Open and sync the project in Android Studio Quail 2 or newer, then wait for indexing. Install the Android CLI and run the commands from the repository root. This workflow was verified with Android Studio Rabbit 2 and Android CLI 1.0.16457483. Use the project name reported as `READY` by `android studio check`.
+
+```powershell
+android --version
+android studio check
+android studio analyze-file --project=ChatDemo app/src/main/java/com/biggemott/chatdemo/ui/chat/ReplyDelay.kt
+git ls-files -- '*.kt' '*.kts' 'app/src/*.xml' | ForEach-Object {
+    android studio analyze-file --project=ChatDemo $_
+}
+```
+
+For a task check, pass the changed files individually. The loop covers the tracked handwritten Kotlin, Gradle Kotlin DSL, and XML files. Check each reported path and diagnostic even when the exit code is zero. After external edits, reopen the file and wait for IDE highlighting before retrying. On first use or after a tool upgrade, temporarily change `delay(duration)` to `delay(duration.inWholeMilliseconds)` in `ReplyDelay.kt`, confirm the legacy-overload diagnostic, then undo only that change. If the probe fails, use Android Studio's **Inspect Code** action on the same source scope and report any coverage gaps. The inspection runs separately from `verifyProject`.
+
 ## Architecture
 
 - **Platform and presentation** use Kotlin, Jetpack Compose, Material 3, and a single Android activity.
