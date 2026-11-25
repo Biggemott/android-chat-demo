@@ -2,12 +2,10 @@ package com.biggemott.chatdemo.ui.chat
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
@@ -16,28 +14,30 @@ import androidx.compose.foundation.shape.AbsoluteRoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.AbsoluteAlignment
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDirection
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.biggemott.chatdemo.R
 import com.biggemott.chatdemo.domain.DemoChat
 import java.time.ZoneId
 import java.util.Locale
+import kotlin.math.roundToInt
 
 @Composable
 internal fun ChatHistoryPane(
     history: ChatHistory,
     chat: DemoChat,
     locale: Locale,
-    zone: ZoneId,
+    zoneId: String,
     modifier: Modifier = Modifier,
 ) {
     val listState = rememberLazyListState()
@@ -54,7 +54,8 @@ internal fun ChatHistoryPane(
             if (history.items.isEmpty()) {
                 ChatHistoryStatus(stringResource(R.string.chat_empty), modifier)
             } else {
-                ChatTimeline(history.items, chat, listState, modifier) { it.label(locale, zone) }
+                val formatter = remember(locale, zoneId) { timeSectionFormatter(locale, ZoneId.of(zoneId)) }
+                ChatTimeline(history.items, chat, listState, modifier) { formatter.format(it.startsAt) }
             }
         }
     }
@@ -89,28 +90,25 @@ private fun ChatTimeline(
     modifier: Modifier,
     timeLabel: (ChatTimelineItem.TimeSection) -> String,
 ) {
-    BoxWithConstraints(modifier.fillMaxWidth()) {
-        val bubbleWidth = ((maxWidth - historyGutter * 2) * BUBBLE_WIDTH_FRACTION).coerceIn(0.dp, 340.dp)
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            state = listState,
-            reverseLayout = true,
-            contentPadding = PaddingValues(horizontal = historyGutter, vertical = 12.dp),
-        ) {
-            items(
-                items = timeline.asReversed(),
-                key = ChatTimelineItem::key,
-                contentType = { it::class },
-            ) { item ->
-                when (item) {
-                    is ChatTimelineItem.TimeSection -> {
-                        TimeHeader(timeLabel(item))
-                    }
+    LazyColumn(
+        modifier = modifier.fillMaxSize(),
+        state = listState,
+        reverseLayout = true,
+        contentPadding = PaddingValues(horizontal = historyGutter, vertical = 12.dp),
+    ) {
+        items(
+            items = timeline.asReversed(),
+            key = ChatTimelineItem::key,
+            contentType = { it::class },
+        ) { item ->
+            when (item) {
+                is ChatTimelineItem.TimeSection -> {
+                    TimeHeader(timeLabel(item))
+                }
 
-                    is ChatTimelineItem.Bubble -> {
-                        val sender = if (item.isOutgoing) chat.currentUser else chat.otherUser
-                        MessageBubble(item, sender.displayName, bubbleWidth)
-                    }
+                is ChatTimelineItem.Bubble -> {
+                    val sender = if (item.isOutgoing) chat.currentUser else chat.otherUser
+                    MessageBubble(item, sender.displayName)
                 }
             }
         }
@@ -136,7 +134,6 @@ private fun TimeHeader(label: String) {
 private fun MessageBubble(
     bubble: ChatTimelineItem.Bubble,
     senderName: String,
-    maxWidth: Dp,
 ) {
     val colors = MaterialTheme.colorScheme
     val outgoing = bubble.isOutgoing
@@ -152,7 +149,7 @@ private fun MessageBubble(
             style = MaterialTheme.typography.bodyMedium.copy(textDirection = TextDirection.Content),
             modifier =
                 Modifier
-                    .widthIn(max = maxWidth)
+                    .limitBubbleWidth()
                     .background(
                         color = if (outgoing) colors.primaryContainer else colors.secondaryContainer,
                         shape = bubbleShape(bubble.groupPosition, outgoing),
@@ -161,6 +158,17 @@ private fun MessageBubble(
         )
     }
 }
+
+private fun Modifier.limitBubbleWidth(): Modifier =
+    layout { measurable, constraints ->
+        // The lazy list has already deducted its horizontal content padding.
+        val maxWidth = 340.dp.roundToPx()
+        val availableWidth =
+            if (constraints.hasBoundedWidth) (constraints.maxWidth * BUBBLE_WIDTH_FRACTION).roundToInt() else maxWidth
+        val bubbleWidth = minOf(maxWidth, availableWidth).coerceAtLeast(constraints.minWidth)
+        val bubble = measurable.measure(constraints.copy(maxWidth = bubbleWidth))
+        layout(bubble.width, bubble.height) { bubble.placeRelative(0, 0) }
+    }
 
 private fun bubbleShape(
     position: GroupPosition,

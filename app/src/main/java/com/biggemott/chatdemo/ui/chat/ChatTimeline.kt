@@ -25,13 +25,13 @@ sealed interface ChatTimelineItem {
         val startsAt: Instant,
     ) : ChatTimelineItem {
         override val key = "section:${firstMessageId.value}"
-
-        fun label(
-            locale: Locale,
-            zone: ZoneId,
-        ): String = DateTimeFormatter.ofPattern("EEEE HH:mm", locale).withZone(zone).format(startsAt)
     }
 }
+
+internal fun timeSectionFormatter(
+    locale: Locale,
+    zone: ZoneId,
+): DateTimeFormatter = DateTimeFormatter.ofPattern("EEEE HH:mm", locale).withZone(zone)
 
 enum class GroupPosition {
     Single,

@@ -68,7 +68,7 @@ internal fun ChatScreen(
                 history = state.history,
                 chat = state.chat,
                 locale = LocalConfiguration.current.locales[0],
-                zone = zone,
+                zoneId = zone.id,
                 modifier = Modifier.weight(1f),
             )
             ChatComposer(

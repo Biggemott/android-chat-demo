@@ -103,8 +103,8 @@ class ChatTimelineTest {
                 .filterIsInstance<ChatTimelineItem.TimeSection>()
                 .single()
 
-        assertEquals("Thursday 11:59", section.label(Locale.ENGLISH, ZoneOffset.UTC))
-        assertEquals("vendredi 01:59", section.label(Locale.FRENCH, ZoneId.of("Pacific/Kiritimati")))
+        assertEquals("Thursday 11:59", timeSectionFormatter(Locale.ENGLISH, ZoneOffset.UTC).format(section.startsAt))
+        assertEquals("vendredi 01:59", timeSectionFormatter(Locale.FRENCH, ZoneId.of("Pacific/Kiritimati")).format(section.startsAt))
     }
 
     private fun message(
