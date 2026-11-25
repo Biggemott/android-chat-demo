@@ -1,3 +1,6 @@
+// The named palette entries are defined directly by their ARGB values.
+@file:Suppress("MagicNumber")
+
 package com.biggemott.chatdemo.ui.theme
 
 import androidx.compose.ui.graphics.Color

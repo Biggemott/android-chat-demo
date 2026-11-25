@@ -24,8 +24,10 @@ internal abstract class ChatDataModule {
 
         @Provides
         @Singleton
-        fun provideDatabase(@ApplicationContext context: Context, clock: Clock): ChatDatabase =
-            openDemoDatabase(context, clock)
+        fun provideDatabase(
+            @ApplicationContext context: Context,
+            clock: Clock,
+        ): ChatDatabase = openDemoDatabase(context, clock)
 
         @Provides
         fun provideMessageDao(database: ChatDatabase): MessageDao = database.messages()

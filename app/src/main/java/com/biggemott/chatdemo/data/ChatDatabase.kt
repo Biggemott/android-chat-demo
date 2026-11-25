@@ -7,8 +7,8 @@ import androidx.room.Insert
 import androidx.room.Query
 import androidx.room.Room
 import androidx.room.RoomDatabase
-import java.time.Clock
 import kotlinx.coroutines.flow.Flow
+import java.time.Clock
 
 @Database(
     entities = [
@@ -40,6 +40,8 @@ internal fun openDemoDatabase(
     context: Context,
     clock: Clock,
     name: String = "chat-demo.db",
-): ChatDatabase = Room.databaseBuilder(context, ChatDatabase::class.java, name)
-    .addCallback(DemoChatSeed(clock))
-    .build()
+): ChatDatabase =
+    Room
+        .databaseBuilder(context, ChatDatabase::class.java, name)
+        .addCallback(DemoChatSeed(clock))
+        .build()

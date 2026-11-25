@@ -26,8 +26,10 @@ sealed interface ChatTimelineItem {
     ) : ChatTimelineItem {
         override val key = "section:${firstMessageId.value}"
 
-        fun label(locale: Locale, zone: ZoneId): String =
-            DateTimeFormatter.ofPattern("EEEE HH:mm", locale).withZone(zone).format(startsAt)
+        fun label(
+            locale: Locale,
+            zone: ZoneId,
+        ): String = DateTimeFormatter.ofPattern("EEEE HH:mm", locale).withZone(zone).format(startsAt)
     }
 }
 
@@ -38,10 +40,14 @@ enum class GroupPosition {
     Last,
 }
 
-private val groupGap = Duration.ofSeconds(20)
+private const val GROUP_GAP_SECONDS = 20L
+private val groupGap = Duration.ofSeconds(GROUP_GAP_SECONDS)
 private val sectionGap = Duration.ofHours(1)
 
-fun mapChatTimeline(messages: List<Message>, currentUserId: UserId): List<ChatTimelineItem> =
+fun mapChatTimeline(
+    messages: List<Message>,
+    currentUserId: UserId,
+): List<ChatTimelineItem> =
     buildList {
         var previous: Message? = null
         var joinsPrevious = false

@@ -9,10 +9,6 @@ import androidx.test.platform.app.InstrumentationRegistry
 import com.biggemott.chatdemo.domain.ConversationId
 import com.biggemott.chatdemo.domain.NewMessage
 import com.biggemott.chatdemo.domain.UserId
-import java.time.Clock
-import java.time.Instant
-import java.time.ZoneOffset
-import java.util.UUID
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -24,6 +20,10 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
+import java.time.Clock
+import java.time.Instant
+import java.time.ZoneOffset
+import java.util.UUID
 
 @RunWith(AndroidJUnit4::class)
 class ChatStorageTest {
@@ -51,35 +51,49 @@ class ChatStorageTest {
     }
 
     @Test
-    fun persistsBothSendersWithDistinctIdsAndTimestampFromClock() = runBlocking {
-        prepareConversation()
-        val outgoing = repository.sendMessage(NewMessage(chat, nikita, "Hello Sarah"))
-        val incoming = repository.sendMessage(NewMessage(chat, sarah, "Hello Nikita"))
-        val stored = withTimeout(5_000) { repository.observeMessages(chat).first() }
+    fun persistsBothSendersWithDistinctIdsAndTimestampFromClock() =
+        runBlocking {
+            prepareConversation()
+            val outgoing = repository.sendMessage(NewMessage(chat, nikita, "Hello Sarah"))
+            val incoming = repository.sendMessage(NewMessage(chat, sarah, "Hello Nikita"))
+            val stored = withTimeout(5_000) { repository.observeMessages(chat).first() }
 
-        assertNotEquals(outgoing.id, incoming.id)
-        assertTrue(outgoing.id.value > 0)
-        assertEquals(listOf(outgoing, incoming), stored)
-        assertEquals(listOf(nikita, sarah), stored.map { it.senderId })
-        assertEquals(listOf(chat, chat), stored.map { it.conversationId })
-        assertEquals(listOf("Hello Sarah", "Hello Nikita"), stored.map { it.text })
-        assertEquals(listOf(storedNow, storedNow), stored.map { it.sentAt })
-    }
+            assertNotEquals(outgoing.id, incoming.id)
+            assertTrue(outgoing.id.value > 0)
+            assertEquals(listOf(outgoing, incoming), stored)
+            assertEquals(listOf(nikita, sarah), stored.map { it.senderId })
+            assertEquals(listOf(chat, chat), stored.map { it.conversationId })
+            assertEquals(listOf("Hello Sarah", "Hello Nikita"), stored.map { it.text })
+            assertEquals(listOf(storedNow, storedNow), stored.map { it.sentAt })
+        }
 
     @Test
-    fun ordersByTimestampThenIdAndFiltersByConversation() = runBlocking {
-        prepareConversation()
-        val dao = database.messages()
-        val lateId = dao.insert(MessageEntity(conversationId = chat.value, senderId = nikita.value, text = "late", sentAtEpochMs = 3000))
-        val earlyId = dao.insert(MessageEntity(conversationId = chat.value, senderId = sarah.value, text = "early", sentAtEpochMs = 1000))
-        val otherId = dao.insert(MessageEntity(conversationId = otherChat.value, senderId = sarah.value, text = "other", sentAtEpochMs = 1000))
-        val tiedId = dao.insert(MessageEntity(conversationId = chat.value, senderId = nikita.value, text = "tied", sentAtEpochMs = 1000))
+    fun ordersByTimestampThenIdAndFiltersByConversation() =
+        runBlocking {
+            prepareConversation()
+            val dao = database.messages()
+            val lateId =
+                dao.insert(
+                    MessageEntity(conversationId = chat.value, senderId = nikita.value, text = "late", sentAtEpochMs = 3000),
+                )
+            val earlyId =
+                dao.insert(
+                    MessageEntity(conversationId = chat.value, senderId = sarah.value, text = "early", sentAtEpochMs = 1000),
+                )
+            val otherId =
+                dao.insert(
+                    MessageEntity(conversationId = otherChat.value, senderId = sarah.value, text = "other", sentAtEpochMs = 1000),
+                )
+            val tiedId =
+                dao.insert(
+                    MessageEntity(conversationId = chat.value, senderId = nikita.value, text = "tied", sentAtEpochMs = 1000),
+                )
 
-        withTimeout(5_000) {
-            assertEquals(listOf(earlyId, tiedId, lateId), repository.observeMessages(chat).first().map { it.id.value })
-            assertEquals(listOf(otherId), repository.observeMessages(otherChat).first().map { it.id.value })
+            withTimeout(5_000) {
+                assertEquals(listOf(earlyId, tiedId, lateId), repository.observeMessages(chat).first().map { it.id.value })
+                assertEquals(listOf(otherId), repository.observeMessages(otherChat).first().map { it.id.value })
+            }
         }
-    }
 
     @Test
     fun rejectsInvalidForeignKeysAndDuplicateMembership() {
@@ -107,23 +121,24 @@ class ChatStorageTest {
     }
 
     @Test
-    fun emitsInitiallyEmptyThenUpdatesAfterInsert() = runBlocking {
-        prepareConversation()
-        var emissions = 0
-        withTimeout(5_000) {
-            repository.observeMessages(chat).first { messages ->
-                if (emissions++ == 0) {
-                    assertTrue(messages.isEmpty())
-                    repository.sendMessage(NewMessage(chat, sarah, "An update"))
-                    false
-                } else {
-                    assertEquals(listOf("An update"), messages.map { it.text })
-                    true
+    fun emitsInitiallyEmptyThenUpdatesAfterInsert() =
+        runBlocking {
+            prepareConversation()
+            var emissions = 0
+            withTimeout(5_000) {
+                repository.observeMessages(chat).first { messages ->
+                    if (emissions++ == 0) {
+                        assertTrue(messages.isEmpty())
+                        repository.sendMessage(NewMessage(chat, sarah, "An update"))
+                        false
+                    } else {
+                        assertEquals(listOf("An update"), messages.map { it.text })
+                        true
+                    }
                 }
             }
+            assertEquals(2, emissions)
         }
-        assertEquals(2, emissions)
-    }
 
     @Test
     fun rejectsWhitespaceOnlyInput() {
@@ -135,78 +150,92 @@ class ChatStorageTest {
     }
 
     @Test
-    fun firstObservationIncludesCompleteSeedAndReopenPreservesNewMessage() = runBlocking {
-        withDatabaseName { name ->
-            val saved = openDemoDatabase(context, clock, name).useDatabase { demoDb ->
-                val demoRepository = RoomChatRepository(demoDb.messages(), clock)
-                val demo = demoRepository.demoChat
-                val seeded = withTimeout(5_000) { demoRepository.observeMessages(demo.conversation.id).first() }
-                assertEquals("Nikita", demo.currentUser.displayName)
-                assertEquals("Sarah", demo.otherUser.displayName)
-                assertEquals(listOf("nikita:Nikita", "sarah:Sarah"), rows(
-                    demoDb.openHelper.writableDatabase,
-                    "SELECT id || ':' || display_name FROM users ORDER BY id",
-                ))
-                assertEquals(listOf(demo.conversation.id.value), rows(
-                    demoDb.openHelper.writableDatabase,
-                    "SELECT id FROM conversations",
-                ))
-                assertEquals(listOf("nikita", "sarah"), rows(
-                    demoDb.openHelper.writableDatabase,
-                    "SELECT user_id FROM conversation_participants ORDER BY user_id",
-                ))
-                assertEquals(
-                    listOf(sarah, nikita, nikita, sarah, nikita, sarah, sarah, sarah),
-                    seeded.map { it.senderId },
-                )
-                assertEquals(
-                    listOf(-9000L, -8940L, -8932L, -300L, -240L, -180L, -173L, -166L)
-                        .map(storedNow::plusSeconds),
-                    seeded.map { it.sentAt },
-                )
-                assertTrue(seeded.all { it.conversationId == demo.conversation.id && it.text.isNotBlank() })
-                seeded + demoRepository.sendMessage(NewMessage(demo.conversation.id, nikita, "Keep this message"))
-            }
-            val later = Clock.fixed(now.plusSeconds(86_400), ZoneOffset.UTC)
-            openDemoDatabase(context, later, name).useDatabase { demoDb ->
-                val reopened = RoomChatRepository(demoDb.messages(), later)
-                val messages = withTimeout(5_000) { reopened.observeMessages(reopened.demoChat.conversation.id).first() }
-                assertEquals(saved, messages)
+    fun firstObservationIncludesCompleteSeedAndReopenPreservesNewMessage() =
+        runBlocking {
+            withDatabaseName { name ->
+                val saved =
+                    openDemoDatabase(context, clock, name).useDatabase { demoDb ->
+                        val demoRepository = RoomChatRepository(demoDb.messages(), clock)
+                        val demo = demoRepository.demoChat
+                        val seeded = withTimeout(5_000) { demoRepository.observeMessages(demo.conversation.id).first() }
+                        assertEquals("Nikita", demo.currentUser.displayName)
+                        assertEquals("Sarah", demo.otherUser.displayName)
+                        assertEquals(
+                            listOf("nikita:Nikita", "sarah:Sarah"),
+                            rows(
+                                demoDb.openHelper.writableDatabase,
+                                "SELECT id || ':' || display_name FROM users ORDER BY id",
+                            ),
+                        )
+                        assertEquals(
+                            listOf(demo.conversation.id.value),
+                            rows(
+                                demoDb.openHelper.writableDatabase,
+                                "SELECT id FROM conversations",
+                            ),
+                        )
+                        assertEquals(
+                            listOf("nikita", "sarah"),
+                            rows(
+                                demoDb.openHelper.writableDatabase,
+                                "SELECT user_id FROM conversation_participants ORDER BY user_id",
+                            ),
+                        )
+                        assertEquals(
+                            listOf(sarah, nikita, nikita, sarah, nikita, sarah, sarah, sarah),
+                            seeded.map { it.senderId },
+                        )
+                        assertEquals(
+                            listOf(-9000L, -8940L, -8932L, -300L, -240L, -180L, -173L, -166L)
+                                .map(storedNow::plusSeconds),
+                            seeded.map { it.sentAt },
+                        )
+                        assertTrue(seeded.all { it.conversationId == demo.conversation.id && it.text.isNotBlank() })
+                        seeded + demoRepository.sendMessage(NewMessage(demo.conversation.id, nikita, "Keep this message"))
+                    }
+                val later = Clock.fixed(now.plusSeconds(86_400), ZoneOffset.UTC)
+                openDemoDatabase(context, later, name).useDatabase { demoDb ->
+                    val reopened = RoomChatRepository(demoDb.messages(), later)
+                    val messages = withTimeout(5_000) { reopened.observeMessages(reopened.demoChat.conversation.id).first() }
+                    assertEquals(saved, messages)
+                }
             }
         }
-    }
 
     @Test
-    fun reopeningAnEmptyMessageTableDoesNotReseed() = runBlocking {
-        withDatabaseName { name ->
-            openDemoDatabase(context, clock, name).useDatabase {
-                val db = it.openHelper.writableDatabase
-                assertEquals(8, scalar(db, "SELECT COUNT(*) FROM messages"))
-                db.execSQL("DELETE FROM messages")
-            }
-            openDemoDatabase(context, clock, name).useDatabase {
-                val reopened = RoomChatRepository(it.messages(), clock)
-                assertTrue(withTimeout(5_000) { reopened.observeMessages(reopened.demoChat.conversation.id).first() }.isEmpty())
+    fun reopeningAnEmptyMessageTableDoesNotReseed() =
+        runBlocking {
+            withDatabaseName { name ->
+                openDemoDatabase(context, clock, name).useDatabase {
+                    val db = it.openHelper.writableDatabase
+                    assertEquals(8, scalar(db, "SELECT COUNT(*) FROM messages"))
+                    db.execSQL("DELETE FROM messages")
+                }
+                openDemoDatabase(context, clock, name).useDatabase {
+                    val reopened = RoomChatRepository(it.messages(), clock)
+                    assertTrue(withTimeout(5_000) { reopened.observeMessages(reopened.demoChat.conversation.id).first() }.isEmpty())
+                }
             }
         }
-    }
 
     @Test
     fun failedDatabaseCreationRollsBackTheSeed() {
         withDatabaseName { name ->
-            val failingCallback = object : RoomDatabase.Callback() {
-                override fun onCreate(db: SupportSQLiteDatabase) {
-                    assertEquals(8, scalar(db, "SELECT COUNT(*) FROM messages"))
-                    error("Initialization failed after seed writes")
+            val failingCallback =
+                object : RoomDatabase.Callback() {
+                    override fun onCreate(db: SupportSQLiteDatabase) {
+                        assertEquals(8, scalar(db, "SELECT COUNT(*) FROM messages"))
+                        error("Initialization failed after seed writes")
+                    }
                 }
-            }
             val builder = Room.databaseBuilder(context, ChatDatabase::class.java, name)
             builder.addCallback(DemoChatSeed(clock))
             builder.addCallback(failingCallback)
             builder.build().useDatabase {
-                val failure = assertThrows(IllegalStateException::class.java) {
-                    it.openHelper.writableDatabase
-                }
+                val failure =
+                    assertThrows(IllegalStateException::class.java) {
+                        it.openHelper.writableDatabase
+                    }
                 assertEquals("Initialization failed after seed writes", failure.message)
             }
             Room.databaseBuilder(context, ChatDatabase::class.java, name).build().useDatabase {
@@ -228,21 +257,32 @@ class ChatStorageTest {
         }
     }
 
-    private fun insertParticipant(conversation: String, user: String) {
+    private fun insertParticipant(
+        conversation: String,
+        user: String,
+    ) {
         sqlite.execSQL(
             "INSERT INTO conversation_participants (conversation_id, user_id) VALUES (?, ?)",
             arrayOf(conversation, user),
         )
     }
 
-    private fun scalar(db: SupportSQLiteDatabase, sql: String): Int = db.query(sql).use {
-        check(it.moveToFirst())
-        it.getInt(0)
-    }
+    private fun scalar(
+        db: SupportSQLiteDatabase,
+        sql: String,
+    ): Int =
+        db.query(sql).use {
+            check(it.moveToFirst())
+            it.getInt(0)
+        }
 
-    private fun rows(db: SupportSQLiteDatabase, sql: String): List<String> = db.query(sql).use { cursor ->
-        buildList { while (cursor.moveToNext()) add(cursor.getString(0)) }
-    }
+    private fun rows(
+        db: SupportSQLiteDatabase,
+        sql: String,
+    ): List<String> =
+        db.query(sql).use { cursor ->
+            buildList { while (cursor.moveToNext()) add(cursor.getString(0)) }
+        }
 
     private inline fun withDatabaseName(test: (String) -> Unit) {
         val name = "chat-test-${UUID.randomUUID()}.db"

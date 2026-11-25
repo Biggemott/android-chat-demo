@@ -1,9 +1,16 @@
 plugins {
+    alias(libs.plugins.ktlint)
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.hilt)
     alias(libs.plugins.ksp)
     alias(libs.plugins.room)
+}
+
+ktlint {
+    version.set(libs.versions.ktlint)
+    val buildDirectory = layout.buildDirectory.get().asFile
+    filter { exclude { it.file.startsWith(buildDirectory) } }
 }
 
 android {

@@ -4,14 +4,14 @@ import com.biggemott.chatdemo.domain.ConversationId
 import com.biggemott.chatdemo.domain.Message
 import com.biggemott.chatdemo.domain.MessageId
 import com.biggemott.chatdemo.domain.UserId
-import java.time.Instant
-import java.time.ZoneId
-import java.time.ZoneOffset
-import java.util.Locale
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.time.Instant
+import java.time.ZoneId
+import java.time.ZoneOffset
+import java.util.Locale
 
 class ChatTimelineTest {
     @Test
@@ -33,10 +33,10 @@ class ChatTimelineTest {
     fun preservesRepositoryOrderAndKeysWhenHistoryGrows() {
         val initial = listOf(message(4, 0, otherUser), message(9, 0))
         val original = mapChatTimeline(initial, currentUser)
-        val updated = mapChatTimeline(initial + message(12, 1), currentUser)
+        val updated = mapChatTimeline(initial + message(3, 1), currentUser)
 
         assertEquals(listOf("section:4", "message:4", "message:9"), original.map { it.key })
-        assertEquals(original.map { it.key }, updated.take(original.size).map { it.key })
+        assertEquals(original.map { it.key } + "message:3", updated.map { it.key })
         assertFalse(original.filterIsInstance<ChatTimelineItem.Bubble>().first().isOutgoing)
     }
 
@@ -74,11 +74,12 @@ class ChatTimelineTest {
                 message(1, 0),
                 message(2, 3_599_999, otherUser),
                 message(3, 7_199_999),
-                message(4, 10_800_000),
+                message(4, 10_800_000, otherUser),
+                message(5, 14_400_001, otherUser),
             )
 
         assertEquals(
-            listOf("section:1", "message:1", "message:2", "message:3", "section:4", "message:4"),
+            listOf("section:1", "message:1", "message:2", "message:3", "section:4", "message:4", "section:5", "message:5"),
             mapChatTimeline(messages, currentUser).map { it.key },
         )
     }
@@ -106,8 +107,11 @@ class ChatTimelineTest {
         assertEquals("vendredi 01:59", section.label(Locale.FRENCH, ZoneId.of("Pacific/Kiritimati")))
     }
 
-    private fun message(id: Long, epochMillis: Long, sender: UserId = currentUser) =
-        Message(MessageId(id), ConversationId("demo"), sender, "Message $id", Instant.ofEpochMilli(epochMillis))
+    private fun message(
+        id: Long,
+        epochMillis: Long,
+        sender: UserId = currentUser,
+    ) = Message(MessageId(id), ConversationId("demo"), sender, "Message $id", Instant.ofEpochMilli(epochMillis))
 
     private val currentUser = UserId("self")
     private val otherUser = UserId("other")

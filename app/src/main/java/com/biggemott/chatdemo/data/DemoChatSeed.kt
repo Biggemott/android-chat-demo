@@ -12,14 +12,21 @@ import java.time.Clock
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 
-internal val fixedDemoChat = DemoChat(
-    conversation = Conversation(ConversationId("demo")),
-    currentUser = User(UserId("nikita"), "Nikita"),
-    otherUser = User(UserId("sarah"), "Sarah"),
+internal val fixedDemoChat =
+    DemoChat(
+        conversation = Conversation(ConversationId("demo")),
+        currentUser = User(UserId("nikita"), "Nikita"),
+        otherUser = User(UserId("sarah"), "Sarah"),
+    )
+
+internal data class DemoSeedMessage(
+    val senderId: UserId,
+    val text: String,
+    val sentAt: Instant,
 )
 
-internal data class DemoSeedMessage(val senderId: UserId, val text: String, val sentAt: Instant)
-
+// Inline offsets keep the fixed sample conversation's pacing with the text it belongs to.
+@Suppress("MagicNumber")
 internal fun demoSeedMessages(createdAt: Instant): List<DemoSeedMessage> {
     val nikita = fixedDemoChat.currentUser.id
     val sarah = fixedDemoChat.otherUser.id
@@ -41,7 +48,9 @@ internal fun demoSeedMessages(createdAt: Instant): List<DemoSeedMessage> {
     )
 }
 
-internal class DemoChatSeed(private val clock: Clock) : RoomDatabase.Callback() {
+internal class DemoChatSeed(
+    private val clock: Clock,
+) : RoomDatabase.Callback() {
     override fun onCreate(db: SupportSQLiteDatabase) {
         // The framework runs this callback within the database creation transaction.
         val messages = demoSeedMessages(clock.instant())

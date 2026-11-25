@@ -13,7 +13,9 @@ internal data class UserEntity(
 )
 
 @Entity(tableName = "conversations")
-internal data class ConversationEntity(@PrimaryKey val id: String)
+internal data class ConversationEntity(
+    @PrimaryKey val id: String,
+)
 
 @Entity(
     tableName = "conversation_participants",
