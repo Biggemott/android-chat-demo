@@ -1,4 +1,4 @@
-﻿package com.biggemott.chatdemo.ui.chat
+package com.biggemott.chatdemo.ui.chat
 
 import com.biggemott.chatdemo.domain.ConversationId
 import com.biggemott.chatdemo.domain.Message

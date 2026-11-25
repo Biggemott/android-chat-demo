@@ -1,4 +1,4 @@
-﻿package com.biggemott.chatdemo.ui.chat
+package com.biggemott.chatdemo.ui.chat
 
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelStore
