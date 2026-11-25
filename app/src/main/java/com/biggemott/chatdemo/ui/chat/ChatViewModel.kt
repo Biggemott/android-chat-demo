@@ -41,6 +41,7 @@ class ChatViewModel
     @Inject
     constructor(
         repository: ChatRepository,
+        replyDelay: ReplyDelay,
     ) : ViewModel() {
         private val chat = repository.demoChat
         private val mutableUiState = MutableStateFlow(ChatUiState(chat))
@@ -63,4 +64,6 @@ class ChatViewModel
         fun onDraftChanged(text: String) {
             mutableUiState.update { it.copy(draft = text) }
         }
+
+        fun onSend() = Unit
     }
