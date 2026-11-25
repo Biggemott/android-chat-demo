@@ -61,7 +61,7 @@ internal class DemoChatSeed(private val clock: Clock) : RoomDatabase.Callback() 
         for (message in messages) {
             db.execSQL(
                 "INSERT INTO messages (conversation_id, sender_id, text, sent_at_epoch_ms) VALUES (?, ?, ?, ?)",
-                arrayOf(conversationId.value, message.senderId.value, message.text, message.sentAt.toEpochMilli()),
+                arrayOf<Any>(conversationId.value, message.senderId.value, message.text, message.sentAt.toEpochMilli()),
             )
         }
     }
