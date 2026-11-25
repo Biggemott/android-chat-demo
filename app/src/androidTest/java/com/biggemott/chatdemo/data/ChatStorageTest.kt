@@ -24,6 +24,7 @@ import java.time.Clock
 import java.time.Instant
 import java.time.ZoneOffset
 import java.util.UUID
+import kotlin.time.Duration.Companion.seconds
 
 @RunWith(AndroidJUnit4::class)
 class ChatStorageTest {
@@ -56,7 +57,7 @@ class ChatStorageTest {
             prepareConversation()
             val outgoing = repository.sendMessage(NewMessage(chat, nikita, "Hello Sarah"))
             val incoming = repository.sendMessage(NewMessage(chat, sarah, "Hello Nikita"))
-            val stored = withTimeout(5_000) { repository.observeMessages(chat).first() }
+            val stored = withTimeout(5.seconds) { repository.observeMessages(chat).first() }
 
             assertNotEquals(outgoing.id, incoming.id)
             assertTrue(outgoing.id.value > 0)
@@ -89,7 +90,7 @@ class ChatStorageTest {
                     MessageEntity(conversationId = chat.value, senderId = nikita.value, text = "tied", sentAtEpochMs = 1000),
                 )
 
-            withTimeout(5_000) {
+            withTimeout(5.seconds) {
                 assertEquals(listOf(earlyId, tiedId, lateId), repository.observeMessages(chat).first().map { it.id.value })
                 assertEquals(listOf(otherId), repository.observeMessages(otherChat).first().map { it.id.value })
             }
@@ -125,7 +126,7 @@ class ChatStorageTest {
         runBlocking {
             prepareConversation()
             var emissions = 0
-            withTimeout(5_000) {
+            withTimeout(5.seconds) {
                 repository.observeMessages(chat).first { messages ->
                     if (emissions++ == 0) {
                         assertTrue(messages.isEmpty())
@@ -157,7 +158,7 @@ class ChatStorageTest {
                     openDemoDatabase(context, clock, name).useDatabase { demoDb ->
                         val demoRepository = RoomChatRepository(demoDb.messages(), clock)
                         val demo = demoRepository.demoChat
-                        val seeded = withTimeout(5_000) { demoRepository.observeMessages(demo.conversation.id).first() }
+                        val seeded = withTimeout(5.seconds) { demoRepository.observeMessages(demo.conversation.id).first() }
                         assertEquals("Nikita", demo.currentUser.displayName)
                         assertEquals("Sarah", demo.otherUser.displayName)
                         assertEquals(
@@ -196,7 +197,7 @@ class ChatStorageTest {
                 val later = Clock.fixed(now.plusSeconds(86_400), ZoneOffset.UTC)
                 openDemoDatabase(context, later, name).useDatabase { demoDb ->
                     val reopened = RoomChatRepository(demoDb.messages(), later)
-                    val messages = withTimeout(5_000) { reopened.observeMessages(reopened.demoChat.conversation.id).first() }
+                    val messages = withTimeout(5.seconds) { reopened.observeMessages(reopened.demoChat.conversation.id).first() }
                     assertEquals(saved, messages)
                 }
             }
@@ -213,7 +214,7 @@ class ChatStorageTest {
                 }
                 openDemoDatabase(context, clock, name).useDatabase {
                     val reopened = RoomChatRepository(it.messages(), clock)
-                    assertTrue(withTimeout(5_000) { reopened.observeMessages(reopened.demoChat.conversation.id).first() }.isEmpty())
+                    assertTrue(withTimeout(5.seconds) { reopened.observeMessages(reopened.demoChat.conversation.id).first() }.isEmpty())
                 }
             }
         }

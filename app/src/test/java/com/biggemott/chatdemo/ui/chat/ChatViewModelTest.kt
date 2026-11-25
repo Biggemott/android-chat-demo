@@ -188,7 +188,7 @@ class ChatViewModelTest {
 
                 override suspend fun sendMessage(message: NewMessage): Message = error("Presentation must not send messages")
             }
-        val factory = viewModelFactory { initializer { ChatViewModel(repository, ReplyDelay { error("Unexpected reply") }) } }
+        val factory = viewModelFactory { initializer { ChatViewModel(repository) { error("Unexpected reply") } } }
         return ViewModelProvider.create(store, factory)[ChatViewModel::class]
     }
 }

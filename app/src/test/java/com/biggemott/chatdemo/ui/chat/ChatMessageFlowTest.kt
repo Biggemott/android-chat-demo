@@ -51,13 +51,10 @@ class ChatMessageFlowTest {
         val factory =
             viewModelFactory {
                 initializer {
-                    ChatViewModel(
-                        repository,
-                        ReplyDelay {
-                            delaySelections++
-                            (delays.removeFirstOrNull() ?: 1_000).milliseconds
-                        },
-                    )
+                    ChatViewModel(repository) {
+                        delaySelections++
+                        (delays.removeFirstOrNull() ?: 1_000).milliseconds
+                    }
                 }
             }
         viewModel = ViewModelProvider.create(store, factory)[ChatViewModel::class]
@@ -115,19 +112,19 @@ class ChatMessageFlowTest {
             }
             send("First")
             runCurrent()
-            advanceTimeBy(900)
+            advanceTimeBy(900.milliseconds)
             send("Second")
             runCurrent()
-            advanceTimeBy(2_999)
+            advanceTimeBy(2_999.milliseconds)
             runCurrent()
             assertEquals(listOf("First", "Second"), repository.written.map { it.text })
             assertEquals(2, delaySelections)
             assertEquals(listOf(false, true), typing)
-            advanceTimeBy(1)
+            advanceTimeBy(1.milliseconds)
             runCurrent()
             assertEquals(1, repository.replies.size)
             assertEquals(listOf(false, true, false), typing)
-            advanceTimeBy(3_000)
+            advanceTimeBy(3_000.milliseconds)
             runCurrent()
             assertEquals(1, repository.replies.size)
         }
@@ -142,10 +139,10 @@ class ChatMessageFlowTest {
 
             assertEquals(listOf("First", "Second"), repository.written.map { it.text })
             assertEquals(2, delaySelections)
-            advanceTimeBy(2_999)
+            advanceTimeBy(2_999.milliseconds)
             runCurrent()
             assertTrue(repository.replies.isEmpty())
-            advanceTimeBy(1)
+            advanceTimeBy(1.milliseconds)
             runCurrent()
             assertEquals(listOf(scriptedReplies.first()), repository.replies.map { it.text })
         }
@@ -157,16 +154,16 @@ class ChatMessageFlowTest {
             repository.beforeCommit = { if (it.text == "Second") persist.await() }
             send("First")
             runCurrent()
-            advanceTimeBy(999)
+            advanceTimeBy(999.milliseconds)
             send("Second")
             runCurrent()
-            advanceTimeBy(1)
+            advanceTimeBy(1.milliseconds)
             runCurrent()
             assertEquals(listOf("First", "Second"), repository.attempts.map { it.text })
             persist.complete(Unit)
             runCurrent()
             assertEquals(0, repository.replies.size)
-            advanceTimeBy(1_000)
+            advanceTimeBy(1_000.milliseconds)
             runCurrent()
             assertEquals(1, repository.replies.size)
         }
@@ -178,7 +175,7 @@ class ChatMessageFlowTest {
             repository.beforeCommit = { if (it.senderId == fixedDemoChat.otherUser.id) persist.await() }
             send("First")
             runCurrent()
-            advanceTimeBy(1_000)
+            advanceTimeBy(1_000.milliseconds)
             runCurrent()
             send("Second")
             runCurrent()
@@ -187,7 +184,7 @@ class ChatMessageFlowTest {
             runCurrent()
             assertEquals("Second", repository.written.last().text)
             assertEquals(1, repository.replies.size)
-            advanceTimeBy(1_000)
+            advanceTimeBy(1_000.milliseconds)
             runCurrent()
             assertEquals(2, repository.replies.size)
         }
@@ -198,10 +195,10 @@ class ChatMessageFlowTest {
             repository.beforeCommit = { if (it.text == "Second") throw IOException("Write failed") }
             send("First")
             runCurrent()
-            advanceTimeBy(900)
+            advanceTimeBy(900.milliseconds)
             send("Second")
             runCurrent()
-            advanceTimeBy(100)
+            advanceTimeBy(100.milliseconds)
             runCurrent()
             assertEquals(1, repository.replies.size)
             assertEquals(1, delaySelections)
@@ -215,7 +212,7 @@ class ChatMessageFlowTest {
             runCurrent()
             assertEquals(1, delaySelections)
             store.clear()
-            advanceTimeBy(3_000)
+            advanceTimeBy(3_000.milliseconds)
             runCurrent()
             assertEquals(listOf("First"), repository.written.map { it.text })
         }
@@ -230,7 +227,7 @@ class ChatMessageFlowTest {
                 store.clear()
             }
             runCurrent()
-            advanceTimeBy(3_000)
+            advanceTimeBy(3_000.milliseconds)
             runCurrent()
 
             assertEquals(listOf("First"), repository.written.map { it.text })
@@ -244,7 +241,7 @@ class ChatMessageFlowTest {
             repository.beforeCommit = { if (it.senderId == fixedDemoChat.otherUser.id) commit.await() }
             send("First")
             runCurrent()
-            advanceTimeBy(1_000)
+            advanceTimeBy(1_000.milliseconds)
             runCurrent()
             assertEquals(fixedDemoChat.otherUser.id, repository.attempts.last().senderId)
             assertTrue(viewModel.uiState.value.isReplyPending)
@@ -263,7 +260,7 @@ class ChatMessageFlowTest {
             repository.afterCommit = { if (it.senderId == fixedDemoChat.otherUser.id) resume.await() }
             send("First")
             runCurrent()
-            advanceTimeBy(1_000)
+            advanceTimeBy(1_000.milliseconds)
             runCurrent()
             assertTrue(viewModel.uiState.value.isReplyPending)
             assertEquals(listOf(scriptedReplies.first()), repository.replies.map { it.text })
@@ -300,7 +297,7 @@ class ChatMessageFlowTest {
             viewModel.onRecoverDraft()
             assertEquals("Second", viewModel.uiState.value.draft)
             assertFalse(viewModel.uiState.value.canRecoverDraft)
-            advanceTimeBy(3_000)
+            advanceTimeBy(3_000.milliseconds)
             runCurrent()
             assertEquals(emptyList<Message>(), repository.written)
             assertEquals(0, delaySelections)
@@ -326,7 +323,7 @@ class ChatMessageFlowTest {
             repository.beforeCommit = { if (it.senderId == fixedDemoChat.otherUser.id) throw IOException("Write failed") }
             send("First attempt")
             runCurrent()
-            advanceTimeBy(1_000)
+            advanceTimeBy(1_000.milliseconds)
             runCurrent()
             assertFalse(viewModel.uiState.value.isReplyPending)
             assertTrue(repository.replies.isEmpty())
@@ -334,7 +331,7 @@ class ChatMessageFlowTest {
             repeat(scriptedReplies.size + 1) {
                 send("Next")
                 runCurrent()
-                advanceTimeBy(1_000)
+                advanceTimeBy(1_000.milliseconds)
                 runCurrent()
             }
             assertEquals(scriptedReplies + scriptedReplies.first(), repository.replies.map { it.text })
@@ -356,7 +353,7 @@ class ChatMessageFlowTest {
             runCurrent()
             assertTrue(viewModel.uiState.value.history is ChatHistory.Content)
             assertEquals(viewModel.uiState.first(), viewModel.uiState.first())
-            advanceTimeBy(3_000)
+            advanceTimeBy(3_000.milliseconds)
             runCurrent()
             assertEquals(emptyList<NewMessage>(), repository.attempts)
             assertEquals(1, repository.observationCount)

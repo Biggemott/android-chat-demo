@@ -45,6 +45,7 @@ import java.time.Clock
 import java.time.Instant
 import java.time.ZoneOffset
 import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 
 @RunWith(AndroidJUnit4::class)
 class ChatActivityTest {
@@ -107,7 +108,7 @@ class ChatActivityTest {
     private fun exerciseConversation(recreate: Boolean) {
         val chat = repository.demoChat
         runBlocking {
-            withTimeout(5_000) {
+            withTimeout(5.seconds) {
                 repeat(24) {
                     repository.sendMessage(NewMessage(chat.conversation.id, chat.currentUser.id, "Earlier note ${it + 1}"))
                 }
@@ -139,7 +140,7 @@ class ChatActivityTest {
         assertTrue("Outgoing bubble is on the physical right", outgoingBounds.left > replyBounds.left)
         assertTrue("The reply follows the outgoing message", outgoingBounds.bottom < replyBounds.top)
         compose.onNodeWithText("Sarah is typing…").assertDoesNotExist()
-        val stored = runBlocking { withTimeout(5_000) { repository.observeMessages(chat.conversation.id).first() } }
+        val stored = runBlocking { withTimeout(5.seconds) { repository.observeMessages(chat.conversation.id).first() } }
         assertEquals(34, stored.size)
         assertEquals(listOf(outgoing, reply), stored.takeLast(2).map { it.text })
         assertEquals(listOf(chat.currentUser.id, chat.otherUser.id), stored.takeLast(2).map { it.senderId })
