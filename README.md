@@ -1,6 +1,6 @@
 # Chat Demo
 
-Chat Demo is a single-module native Android project for an offline conversation between two fixed demo users, Nikita and Sarah. The app currently opens a Material 3 placeholder. A presentation layer prepares the Room-backed conversation and holds an in-memory draft for the future chat screen.
+Chat Demo is a single-module native Android project for an offline conversation between two fixed demo users, Nikita and Sarah. The Compose screen opens the Room-backed conversation at the latest message and lets you edit a multiline draft.
 
 ## Build and test
 
@@ -13,7 +13,7 @@ The project uses Compose BOM 2026.09.00 with compile SDK 37.0. The newer stable 
 .\gradlew.bat connectedDebugAndroidTest
 ```
 
-The fast gate runs ktlint, Detekt, Android Lint, JVM tests, and debug assembly. It checks formatting without changing source files. Detekt runs the stable CLI against handwritten Kotlin with its own compiler and without type resolution. On macOS or Linux, use `./gradlew` in place of `.\gradlew.bat`. The connected tests require a running emulator or connected device. To open the app, select a device and run the `app` configuration in Android Studio.
+The fast gate runs ktlint, Detekt, Android Lint, JVM tests including screenshot comparisons, and debug assembly. It checks formatting without changing source files. Detekt runs the stable CLI against handwritten Kotlin with its own compiler and without type resolution. On macOS or Linux, use `./gradlew` in place of `.\gradlew.bat`. The connected tests require a running emulator or connected device. To open the app, select a device and run the `app` configuration in Android Studio.
 
 ## Architecture
 
@@ -44,9 +44,20 @@ A Hilt-injected `ChatViewModel` exposes a read-only `StateFlow` with loading, co
 
 The pure Kotlin mapper keeps repository order and uses message IDs as the basis for stable bubble and section keys. Consecutive messages from the same sender group when less than 20 seconds apart. The first message and any gap greater than one hour start a time section. Section labels use a caller-supplied locale and time zone, so they can update after a configuration change.
 
+The activity collects the ViewModel state with Compose's lifecycle-aware APIs. The screen has separate loading, empty, populated, and unavailable history states. A saveable, bottom-anchored lazy list places short histories just above the composer and keeps the latest messages in view as the viewport shrinks. Message sides stay fixed across layout directions. The initial avatar, grouped gray and pink bubbles, and light and dark Material 3 palettes use app resources and system typography. The composer uses one to five visible lines and follows system-bar and keyboard insets.
+
 ## Testing
 
-JVM tests cover timeline boundaries, authorship, stable keys, time labels, and ViewModel transitions using a controlled coroutine scheduler. Data integration tests use real Room databases and cover sender constraints, chronological ordering, observable updates, clock-based timestamps, seed data, and persistence.
+JVM tests cover timeline boundaries, authorship, stable keys, time labels, and ViewModel transitions using a controlled coroutine scheduler. Data integration tests use real Room databases and cover sender constraints, chronological ordering, observable updates, clock-based timestamps, seed data, and persistence. Compose instrumentation opens the real seeded chat to check the latest message, sections, editing, and the disabled send control. A short fixture checks bubble alignment, order, and relative spacing without depending on how much history fits on a device. The test APK uses stable Espresso 3.7.0 for compatibility with Android 17.
+
+Roborazzi on Robolectric checks five deterministic images in [the screenshot baseline directory](app/src/test/screenshots). They cover seeded light and dark chat, empty history, an enabled multiline composer, and large text with an emoji. The captures use a fixed virtual device, Android API, locale, theme, font scale, and UTC seed timestamps. Debug-only Compose previews use the same fixtures. Stable Paparazzi 1.3.5 cannot run with this project's AGP 9.5 setup because its plugin requires the removed `BaseExtension`.
+
+```powershell
+.\gradlew.bat :app:verifyRoborazziDebug
+.\gradlew.bat :app:recordRoborazziDebug
+```
+
+Use the record task for an intentional visual change and review the new images before committing them. The verify task compares against the tracked baselines.
 
 ## Assumptions and limits
 
@@ -54,4 +65,4 @@ The demo is local to a single installation. The intended conversation has exactl
 
 The app disables Android Auto Backup and explicitly excludes its database directory from legacy backup, cloud backup, and Android device-to-device transfer where the platform applies those rules. Device makers can handle transfer differently. [Android backup behavior](https://developer.android.com/identity/data/autobackup)
 
-The launch screen is a placeholder. Rendering the conversation, sending from the UI, automatic replies, draft persistence, and screenshot testing are future work. The demo has no account, network delivery, or synchronization.
+The draft is held in memory. The live send control is disabled until message submission is wired to the repository. Automatic replies, persistent drafts, adaptive incoming-message scrolling, and Arabic UI strings are future work. The demo has no account, network delivery, or synchronization.

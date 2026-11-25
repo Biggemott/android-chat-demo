@@ -1,3 +1,10 @@
 <resources>
     <string name="app_name">Chat Demo</string>
+    <string name="chat_back">Back</string>
+    <string name="chat_loading">Loading conversation…</string>
+    <string name="chat_empty">No messages yet</string>
+    <string name="chat_unavailable">Couldn’t load the conversation</string>
+    <string name="chat_message_hint">Message</string>
+    <string name="chat_send">Send message</string>
+    <string name="chat_spoken_message">%1$s. %2$s</string>
 </resources>

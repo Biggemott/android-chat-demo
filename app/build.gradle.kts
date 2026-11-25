@@ -5,6 +5,7 @@ plugins {
     alias(libs.plugins.hilt)
     alias(libs.plugins.ksp)
     alias(libs.plugins.room)
+    alias(libs.plugins.roborazzi)
 }
 
 ktlint {
@@ -41,6 +42,7 @@ android {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
+    testOptions.unitTests.isIncludeAndroidResources = true
     buildFeatures {
         compose = true
     }
@@ -50,8 +52,15 @@ room {
     schemaDirectory("$projectDir/schemas")
 }
 
+roborazzi {
+    outputDir.set(file("src/test/screenshots"))
+}
+
 dependencies {
     constraints {
+        androidTestImplementation(libs.androidx.espresso.core) {
+            because("Older Espresso versions reflectively call InputManager.getInstance, which Android 17 removed")
+        }
         implementation(libs.androidx.lifecycle.runtime) {
             because("Activity Compose's transitive Lifecycle lint checks use obsolete lint APIs")
         }
@@ -62,6 +71,7 @@ dependencies {
     ksp(libs.androidx.room.compiler)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.androidx.lifecycle.viewmodel)
+    implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.compose.material3)
@@ -69,8 +79,13 @@ dependencies {
     implementation(libs.androidx.compose.ui.graphics)
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
+    add("testDebugImplementation", platform(libs.androidx.compose.bom))
+    add("testDebugImplementation", libs.robolectric)
+    add("testDebugImplementation", libs.roborazzi.compose)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     androidTestImplementation(libs.androidx.junit)
+    debugImplementation(libs.androidx.compose.ui.tooling)
+    debugImplementation(libs.androidx.compose.ui.tooling.preview)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
 }

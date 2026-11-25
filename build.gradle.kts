@@ -5,6 +5,7 @@ plugins {
     alias(libs.plugins.hilt) apply false
     alias(libs.plugins.ksp) apply false
     alias(libs.plugins.room) apply false
+    alias(libs.plugins.roborazzi) apply false
 }
 
 ktlint {
@@ -33,6 +34,6 @@ val detekt =
 
 tasks.register("verifyProject") {
     group = "verification"
-    description = "Runs Kotlin style and static analysis, Android Lint, JVM tests, and debug assembly."
-    dependsOn("ktlintCheck", ":app:ktlintCheck", detekt, ":app:lintDebug", ":app:testDebugUnitTest", ":app:assembleDebug")
+    description = "Runs Kotlin style and static analysis, Android Lint, JVM tests with screenshot verification, and debug assembly."
+    dependsOn("ktlintCheck", ":app:ktlintCheck", detekt, ":app:lintDebug", ":app:verifyRoborazziDebug", ":app:assembleDebug")
 }
