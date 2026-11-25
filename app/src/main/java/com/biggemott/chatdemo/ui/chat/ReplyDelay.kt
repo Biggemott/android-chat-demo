@@ -11,7 +11,10 @@ fun interface ReplyDelay {
     suspend fun await()
 }
 
-internal fun randomReplyDelayMillis(random: Random): Long = random.nextInt(1_000, 3_001).toLong()
+private const val MIN_REPLY_DELAY_MS = 1_000
+private const val MAX_REPLY_DELAY_MS = 3_000
+
+internal fun randomReplyDelayMillis(random: Random): Long = random.nextInt(MIN_REPLY_DELAY_MS, MAX_REPLY_DELAY_MS + 1).toLong()
 
 @Module
 @InstallIn(ViewModelComponent::class)
