@@ -37,7 +37,7 @@ class ChatLayoutTest {
         val state = ChatUiState(chat, ChatHistory.Content(mapChatTimeline(messages, chat.currentUser.id)))
         compose.setContent {
             ChatDemoTheme {
-                ChatScreen(state, onBack = {}, onDraftChanged = {})
+                ChatScreen(state, onBack = {})
             }
         }
 

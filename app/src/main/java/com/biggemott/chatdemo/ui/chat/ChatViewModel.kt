@@ -5,7 +5,6 @@ import androidx.lifecycle.viewModelScope
 import com.biggemott.chatdemo.domain.ChatRepository
 import com.biggemott.chatdemo.domain.DemoChat
 import com.biggemott.chatdemo.domain.Message
-import com.biggemott.chatdemo.domain.MessageId
 import com.biggemott.chatdemo.domain.NewMessage
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CoroutineStart
@@ -31,7 +30,7 @@ data class ChatUiState(
     val sendError: Boolean = false,
     val canRecoverDraft: Boolean = false,
     val isReplyPending: Boolean = false,
-    val outgoingScrollTarget: MessageId? = null,
+    val outgoingScrollKey: String? = null,
 ) {
     val isDraftNonBlank: Boolean get() = draft.isNotBlank()
     val canSend: Boolean get() = history is ChatHistory.Content && isDraftNonBlank
@@ -57,6 +56,7 @@ class ChatViewModel
         private val chat = repository.demoChat
         private val mutableUiState = MutableStateFlow(ChatUiState(chat))
         val uiState: StateFlow<ChatUiState> = mutableUiState.asStateFlow()
+
         // UI callbacks and reply scheduling are confined to Main. The mutex covers suspension inside Room writes.
         private val writeMutex = Mutex()
         private val failedDrafts = ArrayDeque<String>()
@@ -106,8 +106,8 @@ class ChatViewModel
             mutableUiState.update { it.copy(draft = draft, sendError = hasMore, canRecoverDraft = hasMore) }
         }
 
-        fun onOutgoingScrolled(id: MessageId) {
-            mutableUiState.update { if (it.outgoingScrollTarget == id) it.copy(outgoingScrollTarget = null) else it }
+        fun onOutgoingScrolled(key: String) {
+            mutableUiState.update { if (it.outgoingScrollKey == key) it.copy(outgoingScrollKey = null) else it }
         }
 
         private suspend fun persistOutgoing(
@@ -120,7 +120,7 @@ class ChatViewModel
                     recoverFailedSend(draft, acceptedRevision)
                     return
                 }
-            mutableUiState.update { it.copy(outgoingScrollTarget = stored.id) }
+            mutableUiState.update { it.copy(outgoingScrollKey = messageKey(stored.id)) }
             replaceReply()
         }
 

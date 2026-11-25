@@ -1,6 +1,12 @@
 naming:
   FunctionNaming:
     ignoreAnnotated: [Composable]
+complexity:
+  TooManyFunctions:
+    ignoreAnnotatedFunctions: [Preview, ChatThemePreviews]
 style:
   MaxLineLength:
     maxLineLength: 140
+  UnusedPrivateMember:
+    # Android Studio invokes colocated previews; the CLI cannot see those callers.
+    ignoreAnnotated: [Preview, ChatThemePreviews]

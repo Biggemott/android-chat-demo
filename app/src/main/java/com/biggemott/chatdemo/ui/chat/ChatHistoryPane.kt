@@ -14,33 +14,36 @@ import androidx.compose.foundation.shape.AbsoluteRoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.AbsoluteAlignment
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDirection
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.biggemott.chatdemo.R
 import com.biggemott.chatdemo.domain.DemoChat
+import com.biggemott.chatdemo.ui.theme.ChatDemoTheme
 import java.time.ZoneId
-import java.util.Locale
 import kotlin.math.roundToInt
 
 @Composable
 internal fun ChatHistoryPane(
     history: ChatHistory,
     chat: DemoChat,
-    locale: Locale,
     zoneId: String,
+    listState: LazyListState,
     modifier: Modifier = Modifier,
 ) {
-    val listState = rememberLazyListState()
     when (history) {
         ChatHistory.Loading -> {
             ChatHistoryStatus(stringResource(R.string.chat_loading), modifier)
@@ -54,6 +57,7 @@ internal fun ChatHistoryPane(
             if (history.items.isEmpty()) {
                 ChatHistoryStatus(stringResource(R.string.chat_empty), modifier)
             } else {
+                val locale = LocalConfiguration.current.locales[0]
                 val formatter = remember(locale, zoneId) { timeSectionFormatter(locale, ZoneId.of(zoneId)) }
                 ChatTimeline(history.items, chat, listState, modifier) { formatter.format(it.startsAt) }
             }
@@ -90,6 +94,23 @@ private fun ChatTimeline(
     modifier: Modifier,
     timeLabel: (ChatTimelineItem.TimeSection) -> String,
 ) {
+    val latest = timeline.lastOrNull() as? ChatTimelineItem.Bubble
+    val previousLatestKey = remember { mutableStateOf(latest?.key) }
+    SideEffect {
+        val previous = previousLatestKey.value
+        val wasAtBottom =
+            previous != null &&
+                listState.firstVisibleItemScrollOffset == 0 &&
+                listState.layoutInfo.visibleItemsInfo
+                    .firstOrNull()
+                    ?.key == previous
+        val isNewReply = latest != null && !latest.isOutgoing && latest.key != previous
+        if (wasAtBottom && isNewReply) {
+            // In reverse layout a stable key can keep the previous last message pinned above a new reply.
+            listState.requestScrollToItem(0)
+        }
+        previousLatestKey.value = latest?.key
+    }
     LazyColumn(
         modifier = modifier.fillMaxSize(),
         state = listState,
@@ -182,5 +203,30 @@ private fun bubbleShape(
         AbsoluteRoundedCornerShape(topLeft = round, topRight = top, bottomRight = bottom, bottomLeft = round)
     } else {
         AbsoluteRoundedCornerShape(topLeft = top, topRight = round, bottomRight = round, bottomLeft = bottom)
+    }
+}
+
+@Preview(name = "Loaded", widthDp = 393, heightDp = 460, locale = "en")
+@Composable
+private fun LoadedHistoryPreview() = PreviewChatHistory(seededPreviewChat().history)
+
+@Preview(name = "Loading", widthDp = 393, heightDp = 200, locale = "en")
+@Composable
+private fun LoadingHistoryPreview() = PreviewChatHistory(ChatHistory.Loading)
+
+@Preview(name = "Unavailable", widthDp = 393, heightDp = 200, locale = "en")
+@Composable
+private fun UnavailableHistoryPreview() = PreviewChatHistory(ChatHistory.Unavailable)
+
+@Composable
+private fun PreviewChatHistory(history: ChatHistory) {
+    ChatDemoTheme {
+        ChatHistoryPane(
+            history = history,
+            chat = emptyPreviewChat.chat,
+            zoneId = "UTC",
+            listState = rememberLazyListState(),
+            modifier = Modifier.fillMaxSize(),
+        )
     }
 }

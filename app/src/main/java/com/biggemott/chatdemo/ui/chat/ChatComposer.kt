@@ -1,6 +1,7 @@
 package com.biggemott.chatdemo.ui.chat
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -14,28 +15,39 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextDirection
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.biggemott.chatdemo.R
+import com.biggemott.chatdemo.ui.theme.ChatDemoTheme
 
 @Composable
 internal fun ChatComposer(
     draft: String,
     onDraftChanged: (String) -> Unit,
     onSend: (() -> Unit)?,
+    sendError: Boolean = false,
+    onRecoverDraft: (() -> Unit)? = null,
 ) {
     val colors = MaterialTheme.colorScheme
     val hint = stringResource(R.string.chat_message_hint)
     HorizontalDivider(color = colors.outlineVariant)
+    if (sendError) {
+        SendError(draft.isEmpty(), onRecoverDraft)
+    }
     Row(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -68,6 +80,64 @@ internal fun ChatComposer(
                 painter = painterResource(R.drawable.ic_chat_send),
                 contentDescription = stringResource(R.string.chat_send),
             )
+        }
+    }
+}
+
+@Composable
+private fun SendError(
+    isComposerEmpty: Boolean,
+    onRecoverDraft: (() -> Unit)?,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text =
+                stringResource(
+                    if (onRecoverDraft != null && !isComposerEmpty) R.string.chat_send_error_held else R.string.chat_send_error,
+                ),
+            modifier = Modifier.weight(1f).semantics { liveRegion = LiveRegionMode.Polite },
+            color = MaterialTheme.colorScheme.error,
+            style = MaterialTheme.typography.bodySmall,
+        )
+        if (onRecoverDraft != null) {
+            TextButton(onClick = onRecoverDraft, enabled = isComposerEmpty) {
+                Text(stringResource(R.string.chat_recover_draft))
+            }
+        }
+    }
+}
+
+@Preview(name = "Blank composer", widthDp = 393, locale = "en")
+@Composable
+private fun BlankComposerPreview() = PreviewChatComposer("")
+
+@Preview(name = "Send enabled", widthDp = 393, locale = "en")
+@Composable
+private fun SendEnabledPreview() = PreviewChatComposer(PREVIEW_DRAFT)
+
+@Preview(name = "Send error", widthDp = 393, locale = "en")
+@Composable
+private fun SendErrorPreview() = PreviewChatComposer("", sendError = true)
+
+@Composable
+private fun PreviewChatComposer(
+    draft: String,
+    sendError: Boolean = false,
+) {
+    ChatDemoTheme {
+        Surface {
+            Column {
+                ChatComposer(
+                    draft = draft,
+                    onDraftChanged = {},
+                    onSend = if (draft.isNotBlank()) ({}) else null,
+                    sendError = sendError,
+                    onRecoverDraft = if (sendError) ({}) else null,
+                )
+            }
         }
     }
 }

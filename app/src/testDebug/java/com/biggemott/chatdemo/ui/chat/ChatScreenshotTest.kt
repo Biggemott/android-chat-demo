@@ -32,6 +32,12 @@ class ChatScreenshotTest {
     @Test
     fun largeText() = capture("large-text", seededPreviewChat(lastMessageText = PREVIEW_LONG_MESSAGE), fontScale = 1.5f)
 
+    @Test
+    fun pendingReply() = capture("pending-reply", pendingReplyPreviewChat())
+
+    @Test
+    fun sendError() = capture("send-error", seededPreviewChat().copy(sendError = true, canRecoverDraft = true))
+
     private fun capture(
         name: String,
         state: ChatUiState,
@@ -45,8 +51,7 @@ class ChatScreenshotTest {
                     ChatScreen(
                         state = state,
                         onBack = {},
-                        onDraftChanged = {},
-                        onSend = onSend,
+                        actions = ChatActions(onSend = onSend),
                         zone = ZoneOffset.UTC,
                     )
                 }

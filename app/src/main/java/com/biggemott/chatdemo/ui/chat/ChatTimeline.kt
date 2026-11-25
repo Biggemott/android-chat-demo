@@ -9,6 +9,8 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
+internal fun messageKey(id: MessageId): String = "message:${id.value}"
+
 sealed interface ChatTimelineItem {
     val key: String
 
@@ -17,7 +19,7 @@ sealed interface ChatTimelineItem {
         val isOutgoing: Boolean,
         val groupPosition: GroupPosition,
     ) : ChatTimelineItem {
-        override val key = "message:${message.id.value}"
+        override val key = messageKey(message.id)
     }
 
     data class TimeSection(

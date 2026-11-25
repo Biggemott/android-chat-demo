@@ -27,6 +27,7 @@ A standalone native Android chat demo for two fixed users. Kotlin, Jetpack Compo
 - Use constructor injection with Hilt and lifecycle-aware coroutine/Flow collection. Avoid layers or interfaces with no meaningful responsibility. Keep time and random behavior controllable in tests.
 - Use stable, mutually compatible dependencies and version catalogs; no unnecessary network SDKs, authentication, or background services. Preserve generated Room schema JSON in Git.
 - UI is English by default; use resource strings and prepare for Arabic/RTL, custom light/dark themes and accessibility. No need to implement future UI work during data tasks.
+- Colocate private Compose previews with the components they exercise so they appear in Android Studio's Design panel for those files. Share deterministic fixtures with screenshot tests and keep the actual UI tooling dependency debug-only.
 
 ## Git conventions
 Use Conventional Commits: `type(scope): imperative description` (scope optional when not useful). Types: `feat`, `fix`, `test`, `refactor`, `chore`, `build`, `ci`, `docs`, `perf`. English, imperative mood, no trailing period; one coherent change per commit. Avoid generic messages, internal task numbers and AI-tool names in commit subjects.
