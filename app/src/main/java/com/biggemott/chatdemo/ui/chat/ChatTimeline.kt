@@ -3,6 +3,7 @@
 import com.biggemott.chatdemo.domain.Message
 import com.biggemott.chatdemo.domain.MessageId
 import com.biggemott.chatdemo.domain.UserId
+import java.time.Duration
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -37,12 +38,32 @@ enum class GroupPosition {
     Last,
 }
 
+private val groupGap = Duration.ofSeconds(20)
+private val sectionGap = Duration.ofHours(1)
+
 fun mapChatTimeline(messages: List<Message>, currentUserId: UserId): List<ChatTimelineItem> =
     buildList {
+        var previous: Message? = null
+        var joinsPrevious = false
         messages.forEachIndexed { index, message ->
-            if (index == 0) {
+            val previousMessage = previous
+            if (previousMessage == null || Duration.between(previousMessage.sentAt, message.sentAt) > sectionGap) {
                 add(ChatTimelineItem.TimeSection(message.id, message.sentAt))
             }
-            add(ChatTimelineItem.Bubble(message, message.senderId == currentUserId, GroupPosition.Single))
+
+            val next = messages.getOrNull(index + 1)
+            val joinsNext =
+                next != null && message.senderId == next.senderId &&
+                    Duration.between(message.sentAt, next.sentAt) < groupGap
+            val position =
+                when {
+                    joinsPrevious && joinsNext -> GroupPosition.Middle
+                    joinsPrevious -> GroupPosition.Last
+                    joinsNext -> GroupPosition.First
+                    else -> GroupPosition.Single
+                }
+            add(ChatTimelineItem.Bubble(message, message.senderId == currentUserId, position))
+            previous = message
+            joinsPrevious = joinsNext
         }
     }
