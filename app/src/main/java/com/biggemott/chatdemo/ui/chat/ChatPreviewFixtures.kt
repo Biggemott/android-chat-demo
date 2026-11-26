@@ -25,6 +25,11 @@ internal fun seededPreviewChat(lastMessageText: String? = null): ChatUiState {
 
 internal fun pendingReplyPreviewChat(): ChatUiState = seededPreviewChat().copy(isReplyPending = true)
 
+internal fun arabicPreviewChat(): ChatUiState =
+    seededPreviewChat(lastMessageText = PREVIEW_MIXED_MESSAGE).copy(draft = PREVIEW_ARABIC_DRAFT)
+
 internal const val PREVIEW_DRAFT = "I have the atlas.\nI'll bring it to the harbor."
 internal const val PREVIEW_TALL_DRAFT = "I have the atlas.\nMeet at the harbor.\nTake the blue gate.\nBring tea.\nSee you soon."
 internal const val PREVIEW_LONG_MESSAGE = "Meet at the steps. 🗺️\nBring the map with the harbor trail marked in blue."
+internal const val PREVIEW_MIXED_MESSAGE = "٣٠ دقيقة؟ Lighthouse 12 🗺️\nSee you عند الميناء!"
+internal const val PREVIEW_ARABIC_DRAFT = "هل أحضر الأطلس؟\nMap 12 — عند المنارة 📍"

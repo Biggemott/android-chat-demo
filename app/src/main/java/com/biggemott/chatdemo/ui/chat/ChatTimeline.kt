@@ -7,6 +7,7 @@ import java.time.Duration
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.time.format.DecimalStyle
 import java.util.Locale
 
 internal fun messageKey(id: MessageId): String = "message:${id.value}"
@@ -33,7 +34,11 @@ sealed interface ChatTimelineItem {
 internal fun timeSectionFormatter(
     locale: Locale,
     zone: ZoneId,
-): DateTimeFormatter = DateTimeFormatter.ofPattern("EEEE HH:mm", locale).withZone(zone)
+): DateTimeFormatter =
+    DateTimeFormatter
+        .ofPattern("EEEE HH:mm", locale)
+        .withDecimalStyle(DecimalStyle.of(locale))
+        .withZone(zone)
 
 enum class GroupPosition {
     Single,

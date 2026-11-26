@@ -29,6 +29,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.hideFromAccessibility
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
@@ -93,7 +94,7 @@ private fun ComposerInput(
             value = draft,
             onValueChange = onDraftChanged,
             modifier = Modifier.weight(1f).semantics { contentDescription = hint },
-            placeholder = { Text(hint) },
+            placeholder = { Text(hint, Modifier.semantics { hideFromAccessibility() }) },
             maxLines = 5,
             shape = RoundedCornerShape(24.dp),
             textStyle = MaterialTheme.typography.bodyLarge.copy(textDirection = TextDirection.Content),
@@ -159,6 +160,10 @@ private fun SendEnabledPreview() = PreviewChatComposer(PREVIEW_DRAFT)
 @Preview(name = "Send error", widthDp = 393, locale = "en")
 @Composable
 private fun SendErrorPreview() = PreviewChatComposer("", sendError = true)
+
+@Preview(name = "Arabic recovery, 200% text", widthDp = 320, locale = "ar-rEG", fontScale = 2f)
+@Composable
+private fun ArabicComposerPreview() = PreviewChatComposer(PREVIEW_ARABIC_DRAFT, sendError = true)
 
 @Composable
 private fun PreviewChatComposer(

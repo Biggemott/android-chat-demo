@@ -27,6 +27,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.hideFromAccessibility
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDirection
@@ -173,19 +174,22 @@ private fun MessageBubble(
         modifier = Modifier.fillMaxWidth().padding(top = if (groupedWithPrevious) 3.dp else 9.dp),
         contentAlignment = if (outgoing) AbsoluteAlignment.CenterRight else AbsoluteAlignment.CenterLeft,
     ) {
-        Text(
-            text = bubble.message.text,
-            color = if (outgoing) colors.onPrimaryContainer else colors.onSecondaryContainer,
-            style = MaterialTheme.typography.bodyMedium.copy(textDirection = TextDirection.Content),
+        Box(
             modifier =
                 Modifier
                     .limitBubbleWidth()
                     .background(
                         color = if (outgoing) colors.primaryContainer else colors.secondaryContainer,
                         shape = bubbleShape(bubble.groupPosition, outgoing),
-                    ).semantics { contentDescription = spokenMessage }
-                    .padding(horizontal = 13.dp, vertical = 9.dp),
-        )
+                    ).semantics { contentDescription = spokenMessage },
+        ) {
+            Text(
+                text = bubble.message.text,
+                color = if (outgoing) colors.onPrimaryContainer else colors.onSecondaryContainer,
+                style = MaterialTheme.typography.bodyMedium.copy(textDirection = TextDirection.Content),
+                modifier = Modifier.padding(horizontal = 13.dp, vertical = 9.dp).semantics { hideFromAccessibility() },
+            )
+        }
     }
 }
 
@@ -226,6 +230,10 @@ private fun LoadingHistoryPreview() = PreviewChatHistory(ChatHistory.Loading)
 @Preview(name = "Unavailable", widthDp = 393, heightDp = 200, locale = "en")
 @Composable
 private fun UnavailableHistoryPreview() = PreviewChatHistory(ChatHistory.Unavailable)
+
+@Preview(name = "Arabic mixed text", widthDp = 320, heightDp = 460, locale = "ar-rEG")
+@Composable
+private fun ArabicHistoryPreview() = PreviewChatHistory(arabicPreviewChat().history)
 
 @Composable
 private fun PreviewChatHistory(history: ChatHistory) {

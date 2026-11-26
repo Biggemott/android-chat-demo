@@ -29,6 +29,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -50,11 +51,12 @@ internal fun ChatRoute(
     onBack: () -> Unit,
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val locale = LocalConfiguration.current.locales[0]
     val actions =
-        remember(viewModel, onBack) {
+        remember(viewModel, onBack, locale) {
             ChatActions(
                 viewModel::onDraftChanged,
-                viewModel::onSend,
+                { viewModel.onSend(locale) },
                 viewModel::onRecoverDraft,
                 viewModel::onOutgoingScrolled,
                 onBack,
@@ -193,6 +195,16 @@ private fun PendingReplyPreview() = PreviewChatScreen(pendingReplyPreviewChat())
 @Composable
 private fun ReadingHistoryPreview() = PreviewChatScreen(seededPreviewChat().copy(draft = PREVIEW_TALL_DRAFT), firstVisibleIndex = 2)
 
+@Preview(name = "Arabic light", widthDp = 393, heightDp = 760, locale = "ar-rEG")
+@Preview(name = "Arabic dark", widthDp = 393, heightDp = 760, locale = "ar-rEG", uiMode = Configuration.UI_MODE_NIGHT_YES)
+@Composable
+private fun ArabicChatPreview() = PreviewChatScreen(arabicPreviewChat())
+
+@Preview(name = "Arabic compact, 200% text", widthDp = 540, heightDp = 220, locale = "ar-rEG", fontScale = 2f)
+@Composable
+private fun CompactArabicChatPreview() =
+    PreviewChatScreen(arabicPreviewChat().copy(sendError = true, canRecoverDraft = true), firstVisibleIndex = 2)
+
 @Composable
 private fun PreviewChatScreen(
     state: ChatUiState,
@@ -201,7 +213,7 @@ private fun PreviewChatScreen(
     ChatDemoTheme {
         ChatScreen(
             state = state,
-            actions = ChatActions(onSend = {}),
+            actions = ChatActions(onSend = {}, onRecoverDraft = {}),
             zone = ZoneOffset.UTC,
             listState = rememberLazyListState(initialFirstVisibleItemIndex = firstVisibleIndex),
             animateTyping = false,

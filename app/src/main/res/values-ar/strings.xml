@@ -1,0 +1,15 @@
+<resources>
+    <string name="app_name">محادثة تجريبية</string>
+    <string name="chat_back">رجوع</string>
+    <string name="chat_loading">جارٍ تحميل المحادثة…</string>
+    <string name="chat_empty">لا توجد رسائل بعد</string>
+    <string name="chat_unavailable">تعذّر تحميل المحادثة</string>
+    <string name="chat_message_hint">رسالة</string>
+    <string name="chat_send">إرسال الرسالة</string>
+    <string name="chat_scroll_to_bottom">انتقال إلى أحدث رسالة</string>
+    <string name="chat_send_error">تعذّر حفظ الرسالة.</string>
+    <string name="chat_send_error_held">تعذّر حفظ رسالة. أفرغ حقل الكتابة لاستعادتها.</string>
+    <string name="chat_recover_draft">استعادة المسودة</string>
+    <string name="chat_typing">%1$s تكتب…</string>
+    <string name="chat_spoken_message">%1$s. %2$s</string>
+</resources>

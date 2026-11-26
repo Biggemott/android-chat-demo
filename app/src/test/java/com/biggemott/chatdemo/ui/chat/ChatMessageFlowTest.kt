@@ -34,6 +34,7 @@ import org.junit.Before
 import org.junit.Test
 import java.io.IOException
 import java.time.Instant
+import java.util.Locale
 import kotlin.random.Random
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -86,7 +87,7 @@ class ChatMessageFlowTest {
         runTest {
             draftStore.restored.complete(" \n\t")
             runCurrent()
-            viewModel.onSend()
+            viewModel.onSend(Locale.ENGLISH)
             runCurrent()
             assertEquals(" \n\t", viewModel.uiState.value.draft)
             assertFalse(viewModel.uiState.value.canSend)
@@ -161,7 +162,7 @@ class ChatMessageFlowTest {
             assertEquals(emptyList<NewMessage>(), repository.attempts)
             send("  Atlas 🗺️\n  Harbor  ")
             assertEquals("", viewModel.uiState.value.draft)
-            viewModel.onSend()
+            viewModel.onSend(Locale.ENGLISH)
             send("Second")
             runCurrent()
             assertEquals(listOf("Atlas 🗺️\n  Harbor"), repository.attempts.map { it.text })
@@ -400,6 +401,41 @@ class ChatMessageFlowTest {
         }
 
     @Test
+    fun localizedReplacementAndFailedReplyShareOneSequenceAcrossLanguages() =
+        runTest {
+            val firstArabic = "أنا عند أسفل درج المنارة. وجدت مقعدًا في مكان محمي من الريح."
+            val secondArabic = "افتح صفحة الميناء المطوية في الأطلس. هناك خط منقّط خلف السور القديم."
+            val egyptian = Locale.forLanguageTag("ar-EG")
+            val saudi = Locale.forLanguageTag("ar-SA")
+
+            send("English send")
+            runCurrent()
+            advanceTimeBy(500)
+            send("Arabic replacement", egyptian)
+            runCurrent()
+            advanceTimeBy(1_001)
+            assertEquals(listOf(firstArabic), repository.replies.map { it.text })
+
+            repository.beforeCommit = { if (it.senderId == fixedDemoChat.otherUser.id) throw IOException("Write failed") }
+            send("Failed reply", Locale.FRENCH)
+            runCurrent()
+            advanceTimeBy(1_001)
+            assertEquals(listOf(firstArabic), repository.replies.map { it.text })
+
+            repository.beforeCommit = {}
+            send("Retry the same line", saudi)
+            runCurrent()
+            advanceTimeBy(1_001)
+            send("Fallback to English", Locale.FRENCH)
+            runCurrent()
+            advanceTimeBy(1_001)
+            assertEquals(
+                listOf(firstArabic, secondArabic, "The first bend is just past the keeper's garden."),
+                repository.replies.map { it.text },
+            )
+        }
+
+    @Test
     fun failedReplyDoesNotConsumeTheLineAndSuccessfulRepliesCycle() =
         runTest {
             repository.beforeCommit = { if (it.senderId == fixedDemoChat.otherUser.id) throw IOException("Write failed") }
@@ -458,9 +494,12 @@ class ChatMessageFlowTest {
         assertEquals(3_000.milliseconds, randomReplyDelay(endpoints))
     }
 
-    private fun send(text: String) {
+    private fun send(
+        text: String,
+        locale: Locale = Locale.ENGLISH,
+    ) {
         viewModel.onDraftChanged(text)
-        viewModel.onSend()
+        viewModel.onSend(locale)
     }
 
     private class RecordingRepository : ChatRepository {

@@ -163,7 +163,7 @@ class ChatActivityTest {
         waitForText("Earlier note 48")
         compose.runOnIdle {
             viewModel.onDraftChanged("Waiting for Sarah")
-            viewModel.onSend()
+            viewModel.onSend(Locale.ENGLISH)
         }
         waitForText("Waiting for Sarah")
         val anchor = "Earlier note 18"
@@ -198,9 +198,9 @@ class ChatActivityTest {
         val tall = (1..70).joinToString("\n") { "Long message line $it" }
         compose.runOnIdle {
             viewModel.onDraftChanged("First in the burst")
-            viewModel.onSend()
+            viewModel.onSend(Locale.ENGLISH)
             viewModel.onDraftChanged(tall)
-            viewModel.onSend()
+            viewModel.onSend(Locale.ENGLISH)
         }
         waitForText(tall)
         compose.onNodeWithText(tall).assertIsDisplayed()

@@ -22,6 +22,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.io.IOException
+import java.util.Locale
 import java.util.concurrent.CancellationException
 import java.util.logging.Logger
 import javax.inject.Inject
@@ -105,7 +106,7 @@ class ChatViewModel
         }
 
         @MainThread
-        fun onSend() {
+        fun onSend(locale: Locale) {
             val state = mutableUiState.value
             if (!state.canSend) return
             val draft = state.draft
@@ -114,7 +115,7 @@ class ChatViewModel
             draftStore.save("")
             viewModelScope.launch {
                 writeMutex.withLock {
-                    persistOutgoing(draft, acceptedRevision)
+                    persistOutgoing(draft, acceptedRevision, locale)
                 }
             }
         }
@@ -137,6 +138,7 @@ class ChatViewModel
         private suspend fun persistOutgoing(
             draft: String,
             acceptedRevision: Long,
+            locale: Locale,
         ) {
             val message = NewMessage(chat.conversation.id, chat.currentUser.id, draft.trim())
             val stored =
@@ -145,7 +147,7 @@ class ChatViewModel
                     return
                 }
             mutableUiState.update { it.copy(outgoingScrollKey = messageKey(stored.id)) }
-            replaceReply()
+            replaceReply(scriptedRepliesFor(locale))
         }
 
         private fun recoverFailedSend(
@@ -161,7 +163,7 @@ class ChatViewModel
         }
 
         // Holding writeMutex lets us cancel the previous reply before it enters its write.
-        private fun replaceReply() {
+        private fun replaceReply(script: List<String>) {
             val generation = ++replyGeneration
             replyJob?.cancel()
             val duration = replyDelay.nextDuration()
@@ -171,9 +173,9 @@ class ChatViewModel
                     try {
                         replyDelay.await(duration)
                         writeMutex.withLock {
-                            val reply = NewMessage(chat.conversation.id, chat.otherUser.id, scriptedReplies[replyIndex])
+                            val reply = NewMessage(chat.conversation.id, chat.otherUser.id, script[replyIndex])
                             if (persist(reply) != null) {
-                                replyIndex = (replyIndex + 1) % scriptedReplies.size
+                                replyIndex = (replyIndex + 1) % script.size
                             }
                         }
                     } finally {
