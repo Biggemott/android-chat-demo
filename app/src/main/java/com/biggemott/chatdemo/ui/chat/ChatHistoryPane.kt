@@ -151,7 +151,7 @@ private fun TimeHeader(label: String) {
     Text(
         text = label,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
-        style = MaterialTheme.typography.labelMedium,
+        style = MaterialTheme.typography.labelMedium.copy(textDirection = TextDirection.Content),
         textAlign = TextAlign.Center,
         modifier =
             Modifier

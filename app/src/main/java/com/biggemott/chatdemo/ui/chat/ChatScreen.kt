@@ -44,6 +44,7 @@ import java.time.ZoneId
 import java.time.ZoneOffset
 
 private val chatHeaderHeight = 56.dp
+internal val chatHeaderExtent = chatHeaderHeight + 1.dp
 
 @Composable
 internal fun ChatRoute(
@@ -69,7 +70,7 @@ internal fun ChatRoute(
 internal fun ChatScreen(
     state: ChatUiState,
     actions: ChatActions = ChatActions(),
-    zone: ZoneId = ZoneId.systemDefault(),
+    zone: ZoneId = rememberDeviceTimeZone(),
     listState: LazyListState = rememberLazyListState(),
     animateTyping: Boolean = true,
 ) {
@@ -80,21 +81,23 @@ internal fun ChatScreen(
                     .fillMaxSize()
                     .windowInsetsPadding(WindowInsets.safeDrawing),
         ) {
-            ChatHeader(state.chat.otherUser.displayName, actions.onBack)
-            Box(Modifier.weight(1f)) {
-                ChatHistoryPane(
-                    history = state.history,
-                    chat = state.chat,
-                    zoneId = zone.id,
-                    scroll = rememberChatScroll(listState, state.outgoingScrollKey, actions.onOutgoingScrolled),
-                    typing =
-                        when {
-                            !state.isReplyPending -> null
-                            animateTyping -> Typing.Animated
-                            else -> Typing.Static
-                        },
-                )
-                ChatTypingAnnouncement(state.chat.otherUser.displayName, state.isReplyPending, Modifier.align(Alignment.BottomStart))
+            Column(Modifier.weight(1f)) {
+                ChatHeader(state.chat.otherUser.displayName, actions.onBack)
+                Box(Modifier.weight(1f)) {
+                    ChatHistoryPane(
+                        history = state.history,
+                        chat = state.chat,
+                        zoneId = zone.id,
+                        scroll = rememberChatScroll(listState, state.outgoingScrollKey, actions.onOutgoingScrolled),
+                        typing =
+                            when {
+                                !state.isReplyPending -> null
+                                animateTyping -> Typing.Animated
+                                else -> Typing.Static
+                            },
+                    )
+                    ChatTypingAnnouncement(state.chat.otherUser.displayName, state.isReplyPending, Modifier.align(Alignment.BottomStart))
+                }
             }
             ChatComposer(
                 draft = state.draft,
@@ -112,10 +115,8 @@ private fun ChatHeader(
     displayName: String,
     onBack: () -> Unit,
 ) {
-    val minimumHistoryRoom = 48.dp
-    val minimumWindowHeight = chatHeaderHeight + minimumComposerHeight() + minimumHistoryRoom
     BoxWithConstraints {
-        if (maxHeight >= minimumWindowHeight) {
+        if (maxHeight >= chatHeaderExtent + scrollButtonSize) {
             Column {
                 ChatHeaderContent(displayName, onBack)
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)

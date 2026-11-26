@@ -17,15 +17,20 @@ import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.intl.LocaleList
+import androidx.compose.ui.text.style.ResolvedTextDirection
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.biggemott.chatdemo.ui.theme.ChatDemoTheme
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -40,7 +45,7 @@ class ArabicChatLayoutTest {
 
     @Test
     fun mirrorsControlsButKeepsIncomingLeftAndOutgoingRight() {
-        val state = seededPreviewChat(lastMessageText = "٣٠ دقيقة؟ Lighthouse 12 🗺️\nSee you عند الميناء!")
+        val state = seededPreviewChat(lastMessageText = PREVIEW_MIXED_MESSAGE)
         val list = LazyListState()
         compose.setContent {
             DeviceConfigurationOverride(DeviceConfigurationOverride.Locales(LocaleList("ar-EG"))) {
@@ -48,17 +53,43 @@ class ArabicChatLayoutTest {
             }
         }
 
-        val back = compose.onNodeWithContentDescription("رجوع").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
-        val editor = compose.onNodeWithContentDescription("رسالة").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
-        val send = compose.onNodeWithContentDescription("إرسال الرسالة").assertIsNotEnabled().fetchSemanticsNode().boundsInRoot
+        val back =
+            compose
+                .onNodeWithContentDescription("رجوع")
+                .assertIsDisplayed()
+                .fetchSemanticsNode()
+                .boundsInRoot
+        val editor =
+            compose
+                .onNodeWithContentDescription("رسالة")
+                .assertIsDisplayed()
+                .fetchSemanticsNode()
+                .boundsInRoot
+        val send =
+            compose
+                .onNodeWithContentDescription("إرسال الرسالة")
+                .assertIsNotEnabled()
+                .fetchSemanticsNode()
+                .boundsInRoot
         assertTrue(send.right < editor.left)
         assertTrue(back.left > editor.center.x)
 
-        val incoming = compose.onNodeWithText("٣٠ دقيقة؟ Lighthouse 12 🗺️\nSee you عند الميناء!").fetchSemanticsNode().boundsInRoot
+        val incoming =
+            compose
+                .onNodeWithText(PREVIEW_MIXED_MESSAGE)
+                .assertIsDisplayed()
+                .fetchSemanticsNode()
+                .boundsInRoot
         val outgoing = (state.history as ChatHistory.Content).items.filterIsInstance<ChatTimelineItem.Bubble>().last { it.isOutgoing }
         val outgoingBounds = compose.onNodeWithText(outgoing.message.text).fetchSemanticsNode().boundsInRoot
         assertTrue(incoming.left < outgoingBounds.left)
         assertTrue(outgoingBounds.bottom < incoming.top)
+        val grouped = compose.onNodeWithText("I'll bring the thermos. It looks windy out there.").fetchSemanticsNode().boundsInRoot
+        assertEquals(incoming.left, grouped.left, 0.5f)
+        assertTrue(incoming.top - grouped.bottom < grouped.top - outgoingBounds.bottom)
+        val textLayout = textLayoutOf(PREVIEW_MIXED_MESSAGE)
+        assertEquals(ResolvedTextDirection.Rtl, textLayout.getParagraphDirection(0))
+        assertEquals(ResolvedTextDirection.Ltr, textLayout.getParagraphDirection(PREVIEW_MIXED_MESSAGE.indexOf('\n') + 1))
         compose.onNodeWithText("الخميس ١٤:٢٤").assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.Heading))
     }
 
@@ -77,12 +108,12 @@ class ArabicChatLayoutTest {
             }
         }
 
-        val errorText = compose.onNodeWithText("تعذّر حفظ رسالة. أفرغ حقل الكتابة لاستعادتها.", useUnmergedTree = true)
-        val layouts = mutableListOf<TextLayoutResult>()
-        errorText.assertIsDisplayed().performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
-        assertFalse("The whole recovery instruction is visible", layouts.single().hasVisualOverflow)
+        val errorLayout = textLayoutOf("تعذّر الحفظ. أفرغ الحقل.")
+        assertFalse("The whole recovery instruction is visible", errorLayout.hasVisualOverflow)
 
-        val recover = compose.onNodeWithText("استعادة المسودة").assertIsDisplayed().assertIsNotEnabled()
+        val recoveryLabel = "استعادة المسودة"
+        val recover =
+            compose.onNode(hasText(recoveryLabel) or hasContentDescription(recoveryLabel)).assertIsDisplayed().assertIsNotEnabled()
         val send = compose.onNodeWithContentDescription("إرسال الرسالة").assertIsEnabled()
         val minTarget = with(compose.density) { 48.dp.roundToPx() }
         assertTrue(recover.fetchSemanticsNode().boundsInRoot.height >= minTarget)
@@ -90,5 +121,39 @@ class ArabicChatLayoutTest {
         compose.runOnIdle { state = state.copy(draft = "") }
         recover.assertIsEnabled()
         send.assertIsNotEnabled()
+    }
+
+    @Test
+    fun latestMessageControlFloatsOnTheLeftWithAFullTarget() {
+        val list = LazyListState(firstVisibleItemIndex = 4)
+        compose.setContent {
+            DeviceConfigurationOverride(DeviceConfigurationOverride.Locales(LocaleList("ar-EG"))) {
+                DeviceConfigurationOverride(DeviceConfigurationOverride.FontScale(2f)) {
+                    ChatDemoTheme {
+                        Box(Modifier.size(320.dp, 350.dp)) {
+                            ChatScreen(arabicPreviewChat(), zone = ZoneOffset.UTC, listState = list)
+                        }
+                    }
+                }
+            }
+        }
+
+        val latest = compose.onNodeWithContentDescription("انتقال إلى أحدث رسالة").assertIsDisplayed()
+        val button = latest.fetchSemanticsNode().boundsInRoot
+        val editor = compose.onNodeWithContentDescription("رسالة").fetchSemanticsNode().boundsInRoot
+        val minTarget = with(compose.density) { 48.dp.roundToPx() }
+        assertTrue(button.width >= minTarget && button.height >= minTarget)
+        assertTrue(button.right < editor.left && button.bottom <= editor.top)
+        latest.performClick().assertDoesNotExist()
+        compose.runOnIdle { assertEquals(0, list.firstVisibleItemIndex) }
+    }
+
+    private fun textLayoutOf(text: String): TextLayoutResult {
+        val layouts = mutableListOf<TextLayoutResult>()
+        compose
+            .onNodeWithText(text, useUnmergedTree = true)
+            .assertIsDisplayed()
+            .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
+        return layouts.single()
     }
 }

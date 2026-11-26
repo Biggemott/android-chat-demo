@@ -410,25 +410,25 @@ class ChatMessageFlowTest {
 
             send("English send")
             runCurrent()
-            advanceTimeBy(500)
+            advanceTimeBy(500.milliseconds)
             send("Arabic replacement", egyptian)
             runCurrent()
-            advanceTimeBy(1_001)
+            advanceTimeBy(1_001.milliseconds)
             assertEquals(listOf(firstArabic), repository.replies.map { it.text })
 
             repository.beforeCommit = { if (it.senderId == fixedDemoChat.otherUser.id) throw IOException("Write failed") }
             send("Failed reply", Locale.FRENCH)
             runCurrent()
-            advanceTimeBy(1_001)
+            advanceTimeBy(1_001.milliseconds)
             assertEquals(listOf(firstArabic), repository.replies.map { it.text })
 
             repository.beforeCommit = {}
             send("Retry the same line", saudi)
             runCurrent()
-            advanceTimeBy(1_001)
+            advanceTimeBy(1_001.milliseconds)
             send("Fallback to English", Locale.FRENCH)
             runCurrent()
-            advanceTimeBy(1_001)
+            advanceTimeBy(1_001.milliseconds)
             assertEquals(
                 listOf(firstArabic, secondArabic, "The first bend is just past the keeper's garden."),
                 repository.replies.map { it.text },

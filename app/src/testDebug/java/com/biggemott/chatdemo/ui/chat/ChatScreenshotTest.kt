@@ -47,25 +47,48 @@ class ChatScreenshotTest {
 
     @Test
     fun sendError() = capture("send-error", seededPreviewChat().copy(sendError = true, canRecoverDraft = true))
+}
 
-    private fun capture(
-        name: String,
-        state: ChatUiState,
-        darkTheme: Boolean = false,
-        fontScale: Float = 1f,
-        firstVisibleIndex: Int = 0,
-    ) {
-        captureRoboImage("src/test/screenshots/$name.png") {
-            CompositionLocalProvider(LocalDensity provides Density(LocalDensity.current.density, fontScale)) {
-                ChatDemoTheme(darkTheme = darkTheme) {
-                    ChatScreen(
-                        state = state,
-                        actions = ChatActions(onSend = {}),
-                        zone = ZoneOffset.UTC,
-                        listState = rememberLazyListState(initialFirstVisibleItemIndex = firstVisibleIndex),
-                        animateTyping = false,
-                    )
-                }
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [35], application = Application::class, qualifiers = "ar-rEG-w393dp-h760dp-mdpi")
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
+class ArabicChatScreenshotTest {
+    @Test
+    fun arabicMixedContent() = capture("arabic-mixed", arabicPreviewChat())
+
+    @Test
+    @Config(qualifiers = "ar-rEG-w320dp-h760dp-night-mdpi")
+    fun arabicDarkLargeText() =
+        capture("arabic-dark-large", arabicPreviewChat().copy(isReplyPending = true), darkTheme = true, fontScale = 2f)
+
+    @Test
+    @Config(qualifiers = "ar-rEG-w540dp-h220dp-land-mdpi")
+    fun arabicCompactRecovery() =
+        capture(
+            "arabic-compact-recovery",
+            arabicPreviewChat().copy(sendError = true, canRecoverDraft = true),
+            fontScale = 2f,
+            firstVisibleIndex = 2,
+        )
+}
+
+private fun capture(
+    name: String,
+    state: ChatUiState,
+    darkTheme: Boolean = false,
+    fontScale: Float = 1f,
+    firstVisibleIndex: Int = 0,
+) {
+    captureRoboImage("src/test/screenshots/$name.png") {
+        CompositionLocalProvider(LocalDensity provides Density(LocalDensity.current.density, fontScale)) {
+            ChatDemoTheme(darkTheme = darkTheme) {
+                ChatScreen(
+                    state = state,
+                    actions = ChatActions(onSend = {}),
+                    zone = ZoneOffset.UTC,
+                    listState = rememberLazyListState(initialFirstVisibleItemIndex = firstVisibleIndex),
+                    animateTyping = false,
+                )
             }
         }
     }

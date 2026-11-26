@@ -1,14 +1,12 @@
 package com.biggemott.chatdemo.ui.chat
 
-import android.content.res.Configuration
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.DeviceConfigurationOverride
+import androidx.compose.ui.test.Locales
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
@@ -24,6 +22,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.text.intl.LocaleList
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
@@ -118,17 +117,22 @@ class ChatActivityTest {
     fun sendsThroughRoomAndShowsTheReplyAtTheBottomOfLongHistory() = exerciseConversation(recreate = false)
 
     @Test
-    fun arabicAppConfigurationSelectsArabicForNewRepliesWithoutChangingTheSeed() {
+    fun pendingReplyKeepsItsSendLocaleAcrossAnAppLanguageChange() {
         val arabic = Locale.forLanguageTag("ar-EG")
-        render(arabic)
+        val viewModel = render(arabic)
         waitForText("See you at the steps.")
         val seed = storedMessages()
         val outgoing = "أراك عند المنارة! Lighthouse 12 🗺️\nهل أحضر الأطلس؟"
-        val activity = compose.activity
-        val configuration = Configuration(activity.resources.configuration).apply { setLocale(arabic) }
-        val context = activity.createConfigurationContext(configuration)
-        compose.onNodeWithContentDescription(context.getString(R.string.chat_message_hint)).performTextInput(outgoing)
-        compose.onNodeWithContentDescription(context.getString(R.string.chat_send)).performSemanticsAction(SemanticsActions.OnClick)
+        val editor = compose.onNodeWithContentDescription("رسالة")
+        editor.performTextInput(outgoing)
+        compose.onNodeWithContentDescription("إرسال الرسالة").performSemanticsAction(SemanticsActions.OnClick)
+        waitForText(outgoing)
+        compose.onNodeWithContentDescription("Sarah تكتب…").assertIsDisplayed()
+        val draft = "الخريطة هنا\nMap 12 📍"
+        editor.performTextInput(draft)
+        assertSame(viewModel, render())
+        composer().assert(hasText(draft))
+        typingIndicator().assertIsDisplayed()
         releaseReply.complete(Unit)
 
         val stored =
@@ -271,10 +275,8 @@ class ChatActivityTest {
         compose.activityRule.scenario.onActivity { activity ->
             val factory = viewModelFactory { initializer { ChatViewModel(repository, draftStore, replyDelay) } }
             viewModel = ViewModelProvider.create(activity, factory)[ChatViewModel::class]
-            val configuration = Configuration(activity.resources.configuration).apply { setLocale(locale) }
-            val context = activity.createConfigurationContext(configuration)
             activity.setContent {
-                CompositionLocalProvider(LocalContext provides context, LocalConfiguration provides configuration) {
+                DeviceConfigurationOverride(DeviceConfigurationOverride.Locales(LocaleList(locale.toLanguageTag()))) {
                     ChatDemoTheme { ChatRoute(viewModel, onBack = {}) }
                 }
             }
