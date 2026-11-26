@@ -37,6 +37,28 @@ jobs:
           cache-provider: basic
       - name: Configure Android SDK
         run: bash .github/scripts/setup-android-sdk.sh
+      - name: Report disk space before emulator provisioning
+        run: df -h "$HOME" "$ANDROID_HOME" "$GITHUB_WORKSPACE"
+      - name: Reclaim disk space for the API 37 emulator
+        if: matrix.api == 37 && runner.environment == 'github-hosted'
+        run: |
+          # This project uses neither the Android NDK nor .NET.
+          for directory in /usr/local/lib/android/sdk/ndk /usr/share/dotnet; do
+            if [[ -d "$directory" ]]; then
+              sudo du -sh -- "$directory"
+              sudo rm -rf -- "$directory"
+            fi
+          done
+          df -h "$HOME" "$ANDROID_HOME" "$GITHUB_WORKSPACE"
+      - name: Provision API 37 image and check launch headroom
+        if: matrix.api == 37
+        env:
+          SYSTEM_IMAGE: system-images;android-${{ matrix.image }};${{ matrix.target }};${{ matrix.arch }}
+        run: |
+          yes | sdkmanager --licenses > /dev/null
+          sdkmanager --install emulator "$SYSTEM_IMAGE" --channel=0
+          mkdir -p "$HOME/.android/avd"
+          bash .github/scripts/check-emulator-disk.sh "$HOME/.android/avd"
       - name: Enable KVM
         run: |
           test -c /dev/kvm
