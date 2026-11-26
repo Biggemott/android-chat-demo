@@ -55,7 +55,7 @@ private val minimumTouchTarget = 48.dp
 @Composable
 private fun minimumComposerHeight(): Dp {
     val lineHeight = MaterialTheme.typography.bodyLarge.lineHeight
-    val padding = OutlinedTextFieldDefaults.contentPadding()
+    val padding = OutlinedTextFieldDefaults.contentPaddingWithoutLabel()
     // One readable line, the outlined field's default insets, the surrounding row and its divider.
     val textHeight = with(LocalDensity.current) { lineHeight.toDp() }
     val line = textHeight + padding.calculateTopPadding() + padding.calculateBottomPadding()

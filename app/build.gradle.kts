@@ -19,7 +19,7 @@ val isolatedInstrumentedTests = providers.gradleProperty("isolatedInstrumentedTe
 android {
     namespace = "com.biggemott.chatdemo"
     compileSdk {
-        version = release(37)
+        version = release(37) { minorApiLevel = 1 }
     }
 
     defaultConfig {

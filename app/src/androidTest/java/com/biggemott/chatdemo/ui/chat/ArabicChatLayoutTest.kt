@@ -160,7 +160,7 @@ class ArabicChatLayoutTest {
                 DeviceConfigurationOverride(DeviceConfigurationOverride.FontScale(2f)) {
                     ChatDemoTheme {
                         val lineHeight = MaterialTheme.typography.bodyLarge.lineHeight
-                        val padding = OutlinedTextFieldDefaults.contentPadding()
+                        val padding = OutlinedTextFieldDefaults.contentPaddingWithoutLabel()
                         val minHeight =
                             with(LocalDensity.current) {
                                 lineHeight.toPx() + padding.calculateTopPadding().toPx() + padding.calculateBottomPadding().toPx()
