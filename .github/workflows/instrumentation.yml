@@ -22,7 +22,7 @@ jobs:
           - api: 37
             platform: '37.1'
             image: '37.2'
-            target: google_apis_playstore_ps16k
+            target: google_apis_ps16k
             arch: x86_64
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -39,8 +39,8 @@ jobs:
         run: bash .github/scripts/setup-android-sdk.sh
       - name: Report disk space before emulator provisioning
         run: df -h "$HOME" "$ANDROID_HOME" "$GITHUB_WORKSPACE"
-      - name: Reclaim disk space for the API 37 emulator
-        if: matrix.api == 37 && runner.environment == 'github-hosted'
+      - name: Reclaim disk space for the emulator
+        if: runner.environment == 'github-hosted'
         run: |
           # This project uses neither the Android NDK nor .NET.
           for directory in /usr/local/lib/android/sdk/ndk /usr/share/dotnet; do
@@ -50,13 +50,25 @@ jobs:
             fi
           done
           df -h "$HOME" "$ANDROID_HOME" "$GITHUB_WORKSPACE"
-      - name: Provision API 37 image and check launch headroom
-        if: matrix.api == 37
+      - name: Select Android Command-line Tools 22.0
+        run: |
+          tools="$ANDROID_HOME/cmdline-tools"
+          "$tools/latest/bin/sdkmanager" --install 'cmdline-tools;22.0' --channel=0
+          test -x "$tools/22.0/bin/sdkmanager"
+          test -x "$tools/22.0/bin/avdmanager"
+          # The pinned emulator action prepends cmdline-tools/latest/bin to PATH.
+          if [[ "$(readlink -f "$tools/latest")" != "$(readlink -f "$tools/22.0")" ]]; then
+            mv -T -- "$tools/latest" "$tools/runner-bundled"
+            ln -s 22.0 "$tools/latest"
+          fi
+          echo "$tools/22.0/bin" >> "$GITHUB_PATH"
+          "$tools/22.0/bin/sdkmanager" --version
+      - name: Provision emulator image and check launch headroom
         env:
           SYSTEM_IMAGE: system-images;android-${{ matrix.image }};${{ matrix.target }};${{ matrix.arch }}
         run: |
           yes | sdkmanager --licenses > /dev/null
-          sdkmanager --install emulator "$SYSTEM_IMAGE" --channel=0
+          sdkmanager --install platform-tools emulator "$SYSTEM_IMAGE" --channel=0
           mkdir -p "$HOME/.android/avd"
           bash .github/scripts/check-emulator-disk.sh "$HOME/.android/avd"
       - name: Enable KVM
@@ -65,17 +77,23 @@ jobs:
           sudo setfacl -m "u:$(id -un):rw" /dev/kvm
           test -r /dev/kvm
           test -w /dev/kvm
+      - name: Start ADB server
+        run: adb start-server
       - name: Run connected suite on a fresh emulator
         uses: ReactiveCircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
         env:
           EXPECTED_ANDROID_API: ${{ matrix.api }}
+          EXPECTED_ANDROID_PAGE_SIZE: ${{ matrix.api == 37 && '16384' || '' }}
         with:
           api-level: ${{ matrix.platform }}
           system-image-api-level: ${{ matrix.image }}
           target: ${{ matrix.target }}
           arch: ${{ matrix.arch }}
-          emulator-options: -no-window -gpu swiftshader -no-snapshot -no-audio -no-boot-anim
+          profile: ${{ matrix.api == 37 && 'pixel_6' || '' }}
+          ram-size: ${{ matrix.api == 37 && '2560M' || '' }}
+          emulator-options: ${{ matrix.api == 37 && '-no-window -gpu swiftshader -no-snapshot -no-audio -no-boot-anim -show-kernel -verbose' || '-no-window -gpu swiftshader -no-snapshot -no-audio -no-boot-anim' }}
           disable-linux-hw-accel: false
+          pre-emulator-launch-script: bash .github/scripts/check-emulator-config.sh
           script: bash .github/scripts/run-connected.sh
       - name: Upload failure diagnostics
         if: failure()
@@ -84,5 +102,6 @@ jobs:
           name: instrumentation-api-${{ matrix.api }}
           path: |
             ${{ runner.temp }}/connected-*/
+            ${{ runner.temp }}/emulator-config.txt
             app/build/reports/androidTests/
           retention-days: 7

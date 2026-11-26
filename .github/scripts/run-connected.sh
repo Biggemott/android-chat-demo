@@ -12,6 +12,15 @@ if [[ "$actual_api" != "$EXPECTED_ANDROID_API" ]]; then
     echo "Device $ANDROID_SERIAL reports API $actual_api, expected $EXPECTED_ANDROID_API" >&2
     exit 1
 fi
+echo "Device $ANDROID_SERIAL reports Android API $actual_api" | tee "$results/device.txt"
+if [[ -n "${EXPECTED_ANDROID_PAGE_SIZE:-}" ]]; then
+    page_size=$(adb -s "$ANDROID_SERIAL" shell getconf PAGE_SIZE | tr -d '\r')
+    echo "Device $ANDROID_SERIAL reports a page size of $page_size bytes" | tee -a "$results/device.txt"
+    if [[ "$page_size" != "$EXPECTED_ANDROID_PAGE_SIZE" ]]; then
+        echo "Expected a page size of $EXPECTED_ANDROID_PAGE_SIZE bytes" >&2
+        exit 1
+    fi
+fi
 
 bash ./gradlew :app:connectedDebugAndroidTest -PisolatedInstrumentedTests \
     "-PconnectedResultsDir=$results" --console=plain --stacktrace 2>&1 | tee "$results/gradle.log"
