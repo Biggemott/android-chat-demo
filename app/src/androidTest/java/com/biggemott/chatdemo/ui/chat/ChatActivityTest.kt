@@ -1,11 +1,16 @@
 package com.biggemott.chatdemo.ui.chat
 
+import android.content.res.Configuration
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -47,6 +52,7 @@ import org.junit.runner.RunWith
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneOffset
+import java.util.Locale
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
@@ -110,6 +116,42 @@ class ChatActivityTest {
 
     @Test
     fun sendsThroughRoomAndShowsTheReplyAtTheBottomOfLongHistory() = exerciseConversation(recreate = false)
+
+    @Test
+    fun arabicAppConfigurationSelectsArabicForNewRepliesWithoutChangingTheSeed() {
+        val arabic = Locale.forLanguageTag("ar-EG")
+        render(arabic)
+        waitForText("See you at the steps.")
+        val seed = storedMessages()
+        val outgoing = "أراك عند المنارة! Lighthouse 12 🗺️\nهل أحضر الأطلس؟"
+        val activity = compose.activity
+        val configuration = Configuration(activity.resources.configuration).apply { setLocale(arabic) }
+        val context = activity.createConfigurationContext(configuration)
+        compose.onNodeWithContentDescription(context.getString(R.string.chat_message_hint)).performTextInput(outgoing)
+        compose.onNodeWithContentDescription(context.getString(R.string.chat_send)).performSemanticsAction(SemanticsActions.OnClick)
+        releaseReply.complete(Unit)
+
+        val stored =
+            runBlocking {
+                withTimeout(5.seconds) {
+                    repository.observeMessages(repository.demoChat.conversation.id).first { it.size == seed.size + 2 }
+                }
+            }
+        assertEquals(seed, stored.dropLast(2))
+        assertEquals(outgoing, stored[seed.size].text)
+        assertEquals("أنا عند أسفل درج المنارة. وجدت مقعدًا في مكان محمي من الريح.", stored.last().text)
+    }
+
+    @Test
+    fun messageExposesOneSpokenLabelWithSpeakerAndText() {
+        render()
+        waitForText("See you at the steps.")
+
+        compose
+            .onNodeWithContentDescription("Sarah. See you at the steps.")
+            .assertIsDisplayed()
+            .assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.Text))
+    }
 
     @Test
     fun sendsThroughRoomScrollsFromOlderHistoryAndKeepsReplyAcrossActivityRecreation() = exerciseConversation(recreate = true)
@@ -224,13 +266,17 @@ class ChatActivityTest {
     private fun storedMessages() =
         runBlocking { withTimeout(5.seconds) { repository.observeMessages(repository.demoChat.conversation.id).first() } }
 
-    private fun render(): ChatViewModel {
+    private fun render(locale: Locale = Locale.ENGLISH): ChatViewModel {
         lateinit var viewModel: ChatViewModel
         compose.activityRule.scenario.onActivity { activity ->
             val factory = viewModelFactory { initializer { ChatViewModel(repository, draftStore, replyDelay) } }
             viewModel = ViewModelProvider.create(activity, factory)[ChatViewModel::class]
+            val configuration = Configuration(activity.resources.configuration).apply { setLocale(locale) }
+            val context = activity.createConfigurationContext(configuration)
             activity.setContent {
-                ChatDemoTheme { ChatRoute(viewModel, onBack = {}) }
+                CompositionLocalProvider(LocalContext provides context, LocalConfiguration provides configuration) {
+                    ChatDemoTheme { ChatRoute(viewModel, onBack = {}) }
+                }
             }
         }
         return viewModel
