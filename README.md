@@ -30,7 +30,7 @@ py -3 .github/scripts/validate_connected.py $results $env:ANDROID_SERIAL
 
 On Linux, set `ANDROID_SERIAL` and `EXPECTED_ANDROID_API` and run `bash .github/scripts/run-connected.sh` (Python 3 required). A reused emulator can fail APK installation while Gradle still exits successfully. Check fresh XML for the selected device, at least 35 distinct executed cases, and zero failures, errors, or skips.
 
-In the repository's **Actions** tab, **Fast checks** runs `verifyProject` on Ubuntu 24.04 with Temurin JDK 25, and **Instrumentation** runs independent API 26 and 37 emulator jobs. Both run on pushes and pull requests and support **Run workflow**. Inspect the check results for the commit under review and download diagnostics from a failed run. The local IDE inspection workflow is separate.
+In the repository's **Actions** tab, **Fast checks** runs `verifyProject` on Ubuntu 24.04 with Temurin JDK 25, and **Instrumentation** runs independent API 26 and 37 emulator jobs. Both configure the runner's existing Android SDK before using its tools. Both run on pushes and pull requests and support **Run workflow**. Inspect the JVM XML artifact and the validated device counts for the commit under review. Failed runs provide diagnostics. The local IDE inspection workflow is separate.
 
 ### Change the app language
 
