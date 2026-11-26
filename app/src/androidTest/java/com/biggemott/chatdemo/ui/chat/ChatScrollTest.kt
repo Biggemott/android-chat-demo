@@ -4,18 +4,21 @@ import androidx.compose.foundation.MutatePriority
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasScrollToIndexAction
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.biggemott.chatdemo.data.fixedDemoChat
@@ -103,6 +106,40 @@ class ChatScrollTest {
     }
 
     @Test
+    fun replyJustOutsideTheThresholdKeepsTheOldAnchor() {
+        render()
+        val offset = threshold() + 1
+        position(offset)
+        compose.runOnIdle { state = state.copy(history = history(messages + nextMessage())) }
+        compose.runOnIdle {
+            assertEquals(1, list.firstVisibleItemIndex)
+            assertEquals(offset, list.firstVisibleItemScrollOffset)
+        }
+        bottomButton().assertIsDisplayed()
+    }
+
+    @Test
+    fun thresholdUsesDistanceEvenWhenTheLatestRowIsShorterThanFortyDp() {
+        val latest = messages.last().copy(text = "Short")
+        val records = messages.dropLast(1) + latest
+        state = state.copy(history = history(records))
+        render(fontScale = 0.75f)
+        val offset = threshold() - 1
+        compose.runOnIdle {
+            assertTrue(
+                list.layoutInfo.visibleItemsInfo
+                    .first()
+                    .size < offset,
+            )
+            list.requestScrollToItem(0, offset)
+        }
+        compose.runOnIdle { assertEquals(1, list.firstVisibleItemIndex) }
+        bottomButton().assertDoesNotExist()
+        compose.runOnIdle { state = state.copy(history = history(records + nextMessage())) }
+        compose.runOnIdle { assertEquals(0, list.firstVisibleItemIndex) }
+    }
+
+    @Test
     fun replyDuringAnActiveUserScrollKeepsTheReadingAnchor() {
         render()
         position(threshold() - 1)
@@ -142,12 +179,17 @@ class ChatScrollTest {
         compose.runOnIdle { assertEquals(listOf(key), acknowledged) }
     }
 
-    private fun render(actions: ChatActions = ChatActions()) {
+    private fun render(
+        actions: ChatActions = ChatActions(),
+        fontScale: Float = 1f,
+    ) {
         compose.setContent {
             scope = rememberCoroutineScope()
-            ChatDemoTheme {
-                Box(Modifier.height(height)) {
-                    ChatScreen(state, actions = actions, listState = list, animateTyping = false)
+            CompositionLocalProvider(LocalDensity provides Density(LocalDensity.current.density, fontScale)) {
+                ChatDemoTheme {
+                    Box(Modifier.height(height)) {
+                        ChatScreen(state, actions = actions, listState = list, animateTyping = false)
+                    }
                 }
             }
         }
