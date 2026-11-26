@@ -1,7 +1,10 @@
 package com.biggemott.chatdemo.ui.chat
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -104,7 +107,8 @@ class ArabicChatLayoutTest {
             DeviceConfigurationOverride(DeviceConfigurationOverride.Locales(LocaleList("ar-EG"))) {
                 DeviceConfigurationOverride(DeviceConfigurationOverride.FontScale(2f)) {
                     ChatDemoTheme {
-                        Box(Modifier.size(320.dp, 205.dp)) {
+                        // Keep the tested content area independent of the device's system bars and cutout.
+                        Box(Modifier.windowInsetsPadding(WindowInsets.safeDrawing).size(320.dp, 205.dp)) {
                             ChatScreen(state, actions = ChatActions(onSend = {}), zone = ZoneOffset.UTC)
                         }
                     }
