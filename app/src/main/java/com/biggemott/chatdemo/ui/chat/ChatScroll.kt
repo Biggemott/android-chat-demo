@@ -44,11 +44,11 @@ internal fun rememberChatScroll(
             }
         }
     val acknowledge by rememberUpdatedState(onOutgoingScrolled)
-    LaunchedEffect(list, outgoingKey) {
+    LaunchedEffect(scroll, outgoingKey) {
         if (outgoingKey == null) return@LaunchedEffect
         snapshotFlow {
             val layout = list.layoutInfo
-            layout.viewportSize.height > 0 &&
+            scroll.hasAppliedViewport(layout.viewportSize) && layout.viewportSize.width > 0 && layout.viewportSize.height > 0 &&
                 layout.visibleItemsInfo.any { item ->
                     item.key == outgoingKey && item.offset < layout.viewportEndOffset &&
                         item.offset + item.size > layout.viewportStartOffset
@@ -72,7 +72,7 @@ internal class ChatScroll(
     private var previousTimeline: List<ChatTimelineItem>? = null
     private var previousTyping = false
     private var previousOutgoingKey: String? = null
-    private var previousViewport = IntSize.Zero
+    private var appliedViewport by mutableStateOf(IntSize.Zero)
     val showBottomButton by derivedStateOf {
         viewport.width >= buttonSpace.width && viewport.height >= buttonSpace.height && !isNearBottom()
     }
@@ -84,6 +84,9 @@ internal class ChatScroll(
     fun onViewportChanged(size: IntSize) {
         viewport = size
     }
+
+    // A newly measured viewport may reveal the message before its scroll decision has run.
+    fun hasAppliedViewport(size: IntSize): Boolean = size == appliedViewport
 
     @Composable
     fun ApplyRequests(
@@ -98,7 +101,7 @@ internal class ChatScroll(
         // Size-only updates arrive through onSizeChanged with the same item provider.
         SideEffect {
             val contentChanged = timeline !== previousTimeline || typing != previousTyping
-            val layoutChanged = contentChanged || size != previousViewport
+            val layoutChanged = contentChanged || size != appliedViewport
             val bottomRequested = requests != handledBottomRequests
             if (size.height > 0) {
                 val sendRequested = layoutChanged || outgoingKey != previousOutgoingKey || bottomRequested
@@ -106,12 +109,12 @@ internal class ChatScroll(
                     outgoingIndex >= 0 && sendRequested -> scrollToOutgoing(outgoingIndex, typing, size.height)
                     bottomRequested || (layoutChanged && shouldFollowLatest()) -> list.requestScrollToItem(0)
                 }
+                handledBottomRequests = requests
             }
             previousTimeline = timeline
             previousTyping = typing
             previousOutgoingKey = outgoingKey
-            previousViewport = size
-            handledBottomRequests = requests
+            appliedViewport = size
         }
     }
 
@@ -134,11 +137,25 @@ internal class ChatScroll(
         return if (position >= 0 && typing) position + 1 else position
     }
 
-    private fun shouldFollowLatest() = previousViewport.height > 0 && !list.isScrollInProgress && isNearBottom()
+    private fun shouldFollowLatest() = appliedViewport.height > 0 && !list.isScrollInProgress && isNearBottom()
 
-    // Index zero can still overlap the content padding after firstVisibleItemIndex advances to the next row.
-    private fun isNearBottom(): Boolean =
-        list.layoutInfo.visibleItemsInfo
-            .firstOrNull()
-            ?.let { it.index == 0 && it.offset >= -threshold } ?: true
+    private fun isNearBottom(): Boolean {
+        // A requested position can update these values before layoutInfo reflects the next measurement.
+        val offset = list.firstVisibleItemScrollOffset
+        return when (list.firstVisibleItemIndex) {
+            0 -> {
+                offset <= threshold
+            }
+
+            1 -> {
+                // A short newest row can still overlap the padding immediately before the current item.
+                val newest = list.layoutInfo.visibleItemsInfo.firstOrNull()
+                newest != null && newest.index == 0 && newest.offset + newest.size == -offset && newest.offset >= -threshold
+            }
+
+            else -> {
+                false
+            }
+        }
+    }
 }
