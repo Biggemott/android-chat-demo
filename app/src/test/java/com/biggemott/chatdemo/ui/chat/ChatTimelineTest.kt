@@ -107,6 +107,15 @@ class ChatTimelineTest {
         assertEquals("vendredi 01:59", timeSectionFormatter(Locale.FRENCH, ZoneId.of("Pacific/Kiritimati")).format(section.startsAt))
     }
 
+    @Test
+    fun arabicSectionUsesLocalDigitsAndChangesWeekdayWithTheZone() {
+        val instant = Instant.parse("2026-01-01T11:59:00Z")
+        val arabic = Locale.forLanguageTag("ar-EG")
+
+        assertEquals("الخميس ١١:٥٩", timeSectionFormatter(arabic, ZoneOffset.UTC).format(instant))
+        assertEquals("الجمعة ٠١:٥٩", timeSectionFormatter(arabic, ZoneId.of("Pacific/Kiritimati")).format(instant))
+    }
+
     private fun message(
         id: Long,
         epochMillis: Long,
