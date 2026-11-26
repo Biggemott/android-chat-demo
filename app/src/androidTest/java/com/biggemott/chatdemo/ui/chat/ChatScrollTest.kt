@@ -83,6 +83,19 @@ class ChatScrollTest {
             moveBy(Offset(0f, -36.dp.toPx()))
         }
         bottomButton().assertDoesNotExist()
+        val offset =
+            compose.runOnIdle {
+                assertTrue(list.isScrollInProgress)
+                val position = list.firstVisibleItemScrollOffset
+                assertTrue(position in 1..threshold())
+                state = state.copy(history = history(messages + nextMessage()))
+                position
+            }
+        compose.runOnIdle {
+            assertTrue(list.isScrollInProgress)
+            assertEquals(1, list.firstVisibleItemIndex)
+            assertEquals(offset, list.firstVisibleItemScrollOffset)
+        }
         timeline.performTouchInput { up() }
     }
 
@@ -177,6 +190,48 @@ class ChatScrollTest {
         }
         compose.onNodeWithText(sent.text).assertIsDisplayed()
         compose.runOnIdle { assertEquals(listOf(key), acknowledged) }
+    }
+
+    @Test
+    fun outgoingAndTypingBothFitWhenACompactViewportExpandsWithTheSend() {
+        height = 55.dp
+        compose.setContent {
+            ChatDemoTheme {
+                Box(Modifier.height(height)) {
+                    ChatHistoryPane(
+                        history = state.history,
+                        chat = chat,
+                        zoneId = "UTC",
+                        scroll = rememberChatScroll(list, state.outgoingScrollKey) { state = state.copy(outgoingScrollKey = null) },
+                        typing = Typing.Static.takeIf { state.isReplyPending },
+                    )
+                }
+            }
+        }
+        val sent = nextMessage().copy(senderId = chat.currentUser.id)
+        compose.mainClock.autoAdvance = false
+        try {
+            compose.runOnIdle {
+                assertEquals(with(compose.density) { 55.dp.roundToPx() }, list.layoutInfo.viewportSize.height)
+                state =
+                    state.copy(
+                        history = history(messages + sent),
+                        outgoingScrollKey = messageKey(sent.id),
+                        isReplyPending = true,
+                    )
+                height = 240.dp
+            }
+            compose.mainClock.advanceTimeByFrame()
+            compose.waitForIdle()
+        } finally {
+            compose.mainClock.autoAdvance = true
+        }
+        compose.onNodeWithText(sent.text).assertIsDisplayed()
+        compose.runOnIdle {
+            assertEquals(null, state.outgoingScrollKey)
+            assertEquals(0, list.firstVisibleItemIndex)
+            assertEquals(0, list.firstVisibleItemScrollOffset)
+        }
     }
 
     private fun render(
