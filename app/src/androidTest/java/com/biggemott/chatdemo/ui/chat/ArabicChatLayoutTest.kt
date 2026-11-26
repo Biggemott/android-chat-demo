@@ -3,10 +3,14 @@ package com.biggemott.chatdemo.ui.chat
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.DeviceConfigurationOverride
@@ -146,6 +150,35 @@ class ArabicChatLayoutTest {
         assertTrue(button.right < editor.left && button.bottom <= editor.top)
         latest.performClick().assertDoesNotExist()
         compose.runOnIdle { assertEquals(0, list.firstVisibleItemIndex) }
+    }
+
+    @Test
+    fun shortArabicImeWindowKeepsRoomForOneLineAndSend() {
+        var readableFieldHeight = 0f
+        compose.setContent {
+            DeviceConfigurationOverride(DeviceConfigurationOverride.Locales(LocaleList("ar-EG"))) {
+                DeviceConfigurationOverride(DeviceConfigurationOverride.FontScale(2f)) {
+                    ChatDemoTheme {
+                        val lineHeight = MaterialTheme.typography.bodyLarge.lineHeight
+                        val padding = OutlinedTextFieldDefaults.contentPadding()
+                        val minHeight =
+                            with(LocalDensity.current) {
+                                lineHeight.toPx() + padding.calculateTopPadding().toPx() + padding.calculateBottomPadding().toPx()
+                            }
+                        SideEffect { readableFieldHeight = minHeight }
+                        Box(Modifier.size(width = 320.dp, height = 81.dp)) {
+                            ChatComposer(draft = PREVIEW_ARABIC_DRAFT, onDraftChanged = {}, onSend = {})
+                        }
+                    }
+                }
+            }
+        }
+
+        val editor = compose.onNodeWithContentDescription("رسالة").fetchSemanticsNode().boundsInRoot
+        val send = compose.onNodeWithContentDescription("إرسال الرسالة").fetchSemanticsNode().boundsInRoot
+        val minTarget = with(compose.density) { 48.dp.roundToPx() }
+        assertTrue("Editor height ${editor.height} px must fit a $readableFieldHeight px text line with padding", editor.height + 1 >= readableFieldHeight)
+        assertTrue("Send retains its target in the short viewport", send.height >= minTarget && send.width >= minTarget)
     }
 
     private fun textLayoutOf(text: String): TextLayoutResult {
