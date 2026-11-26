@@ -258,7 +258,7 @@ private fun SendError(
 @Composable
 private fun BlankComposerPreview() = PreviewChatComposer("")
 
-@Preview(name = "Send enabled", widthDp = 393, locale = "en")
+@Preview(name = "Send enabled", widthDp = 393, heightDp = 260, locale = "en")
 @Composable
 private fun SendEnabledPreview() = PreviewChatComposer(PREVIEW_DRAFT)
 
@@ -266,7 +266,7 @@ private fun SendEnabledPreview() = PreviewChatComposer(PREVIEW_DRAFT)
 @Composable
 private fun SendErrorPreview() = PreviewChatComposer("", sendError = true)
 
-@Preview(name = "Arabic recovery, 200% text", widthDp = 320, locale = "ar-rEG", fontScale = 2f)
+@Preview(name = "Arabic recovery, 200% text", widthDp = 320, heightDp = 480, locale = "ar-rEG", fontScale = 2f)
 @Composable
 private fun ArabicComposerPreview() = PreviewChatComposer(PREVIEW_ARABIC_DRAFT, sendError = true)
 
