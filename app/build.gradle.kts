@@ -14,6 +14,8 @@ ktlint {
     filter { exclude { it.file.startsWith(buildDirectory) } }
 }
 
+val isolatedInstrumentedTests = providers.gradleProperty("isolatedInstrumentedTests").isPresent
+
 android {
     namespace = "com.biggemott.chatdemo"
     compileSdk {
@@ -31,6 +33,11 @@ android {
     }
 
     buildTypes {
+        debug {
+            if (isolatedInstrumentedTests) {
+                applicationIdSuffix = ".instrumentation"
+            }
+        }
         release {
             optimization {
                 enable = true
@@ -43,6 +50,7 @@ android {
         targetCompatibility = JavaVersion.VERSION_11
     }
     testOptions.unitTests.isIncludeAndroidResources = true
+    testOptions.resultsDir = providers.gradleProperty("connectedResultsDir").orNull
     buildFeatures {
         compose = true
     }
