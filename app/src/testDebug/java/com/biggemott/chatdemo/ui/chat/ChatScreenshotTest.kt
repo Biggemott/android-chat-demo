@@ -1,6 +1,7 @@
 package com.biggemott.chatdemo.ui.chat
 
 import android.app.Application
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
@@ -24,7 +25,7 @@ class ChatScreenshotTest {
     fun empty() = capture("empty-light", emptyPreviewChat)
 
     @Test
-    fun multilineComposer() = capture("composer-light", seededPreviewChat().copy(draft = PREVIEW_DRAFT), onSend = {})
+    fun multilineComposer() = capture("composer-light", seededPreviewChat().copy(draft = PREVIEW_DRAFT))
 
     @Test
     fun seededDark() = capture("seeded-dark", seededPreviewChat(), darkTheme = true)
@@ -36,23 +37,33 @@ class ChatScreenshotTest {
     fun pendingReply() = capture("pending-reply", pendingReplyPreviewChat())
 
     @Test
+    @Config(qualifiers = "+h440dp")
+    fun olderHistoryWithMultilineDraft() =
+        capture(
+            "older-history",
+            seededPreviewChat().copy(draft = PREVIEW_TALL_DRAFT),
+            firstVisibleIndex = 2,
+        )
+
+    @Test
     fun sendError() = capture("send-error", seededPreviewChat().copy(sendError = true, canRecoverDraft = true))
 
     private fun capture(
         name: String,
         state: ChatUiState,
         darkTheme: Boolean = false,
-        onSend: (() -> Unit)? = null,
         fontScale: Float = 1f,
+        firstVisibleIndex: Int = 0,
     ) {
         captureRoboImage("src/test/screenshots/$name.png") {
             CompositionLocalProvider(LocalDensity provides Density(LocalDensity.current.density, fontScale)) {
                 ChatDemoTheme(darkTheme = darkTheme) {
                     ChatScreen(
                         state = state,
-                        onBack = {},
-                        actions = ChatActions(onSend = onSend),
+                        actions = ChatActions(onSend = {}),
                         zone = ZoneOffset.UTC,
+                        listState = rememberLazyListState(initialFirstVisibleItemIndex = firstVisibleIndex),
+                        animateTyping = false,
                     )
                 }
             }

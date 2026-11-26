@@ -1,7 +1,9 @@
 package com.biggemott.chatdemo.ui.chat
 
+import androidx.annotation.MainThread
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.biggemott.chatdemo.data.DraftStore
 import com.biggemott.chatdemo.domain.ChatRepository
 import com.biggemott.chatdemo.domain.DemoChat
 import com.biggemott.chatdemo.domain.Message
@@ -19,7 +21,9 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import java.io.IOException
 import java.util.concurrent.CancellationException
+import java.util.logging.Logger
 import javax.inject.Inject
 
 data class ChatUiState(
@@ -50,6 +54,7 @@ class ChatViewModel
     @Inject
     constructor(
         private val repository: ChatRepository,
+        private val draftStore: DraftStore,
         private val replyDelay: ReplyDelay,
     ) : ViewModel() {
         private val chat = repository.demoChat
@@ -65,6 +70,14 @@ class ChatViewModel
         private var replyIndex = 0
 
         init {
+            viewModelScope.launch {
+                try {
+                    val restored = draftStore.restore()
+                    if (draftRevision == 0L) mutableUiState.update { it.copy(draft = restored) }
+                } catch (failure: IOException) {
+                    logger.warning("Could not restore chat draft (${failure.javaClass.simpleName})")
+                }
+            }
             viewModelScope.launch {
                 flow { emitAll(repository.observeMessages(chat.conversation.id)) }
                     .map<List<Message>, ChatHistory> { messages ->
@@ -83,18 +96,22 @@ class ChatViewModel
             mutableUiState.update { it.copy(isReplyPending = false) }
         }
 
+        @MainThread
         fun onDraftChanged(text: String) {
             if (text == mutableUiState.value.draft) return
             draftRevision++
             mutableUiState.update { it.copy(draft = text) }
+            draftStore.save(text)
         }
 
+        @MainThread
         fun onSend() {
             val state = mutableUiState.value
             if (!state.canSend) return
             val draft = state.draft
             val acceptedRevision = ++draftRevision
             mutableUiState.update { it.copy(draft = "", sendError = failedDrafts.isNotEmpty()) }
+            draftStore.save("")
             viewModelScope.launch {
                 writeMutex.withLock {
                     persistOutgoing(draft, acceptedRevision)
@@ -102,14 +119,17 @@ class ChatViewModel
             }
         }
 
+        @MainThread
         fun onRecoverDraft() {
             if (mutableUiState.value.draft.isNotEmpty()) return
             val draft = failedDrafts.removeFirstOrNull() ?: return
             draftRevision++
             val hasMore = failedDrafts.isNotEmpty()
             mutableUiState.update { it.copy(draft = draft, sendError = hasMore, canRecoverDraft = hasMore) }
+            draftStore.save(draft)
         }
 
+        @MainThread
         fun onOutgoingScrolled(key: String) {
             mutableUiState.update { if (it.outgoingScrollKey == key) it.copy(outgoingScrollKey = null) else it }
         }
@@ -137,6 +157,7 @@ class ChatViewModel
             mutableUiState.update {
                 it.copy(draft = if (restoreNow) draft else it.draft, sendError = true, canRecoverDraft = failedDrafts.isNotEmpty())
             }
+            if (restoreNow) draftStore.save(draft)
         }
 
         // Holding writeMutex lets us cancel the previous reply before it enters its write.
@@ -163,12 +184,20 @@ class ChatViewModel
                 }
         }
 
+        // The repository can surface storage exceptions without a common base type.
+        @Suppress("TooGenericExceptionCaught")
         private suspend fun persist(message: NewMessage): Message? =
             try {
                 repository.sendMessage(message)
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (_: Exception) {
+            } catch (failure: Exception) {
+                val operation = if (message.senderId == chat.currentUser.id) "send" else "reply"
+                logger.warning("Could not save chat $operation (${failure.javaClass.simpleName})")
                 null
             }
+
+        private companion object {
+            val logger: Logger = Logger.getLogger(ChatViewModel::class.java.name)
+        }
     }

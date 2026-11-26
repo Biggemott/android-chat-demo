@@ -6,6 +6,7 @@
     <string name="chat_unavailable">Couldn’t load the conversation</string>
     <string name="chat_message_hint">Message</string>
     <string name="chat_send">Send message</string>
+    <string name="chat_scroll_to_bottom">Scroll to latest message</string>
     <string name="chat_send_error">Couldn’t save your message.</string>
     <string name="chat_send_error_held">Couldn’t save a message. You can recover it when the composer is empty.</string>
     <string name="chat_recover_draft">Recover draft</string>

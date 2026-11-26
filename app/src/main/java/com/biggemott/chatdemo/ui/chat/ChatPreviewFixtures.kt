@@ -26,4 +26,5 @@ internal fun seededPreviewChat(lastMessageText: String? = null): ChatUiState {
 internal fun pendingReplyPreviewChat(): ChatUiState = seededPreviewChat().copy(isReplyPending = true)
 
 internal const val PREVIEW_DRAFT = "I have the atlas.\nI'll bring it to the harbor."
+internal const val PREVIEW_TALL_DRAFT = "I have the atlas.\nMeet at the harbor.\nTake the blue gate.\nBring tea.\nSee you soon."
 internal const val PREVIEW_LONG_MESSAGE = "Meet at the steps. 🗺️\nBring the map with the harbor trail marked in blue."

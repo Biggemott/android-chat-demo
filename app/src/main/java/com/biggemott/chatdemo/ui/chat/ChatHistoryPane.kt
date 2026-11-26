@@ -6,22 +6,24 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.AbsoluteRoundedCornerShape
+import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.SideEffect
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.AbsoluteAlignment
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
@@ -29,6 +31,8 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import com.biggemott.chatdemo.R
 import com.biggemott.chatdemo.domain.DemoChat
@@ -41,37 +45,34 @@ internal fun ChatHistoryPane(
     history: ChatHistory,
     chat: DemoChat,
     zoneId: String,
-    listState: LazyListState,
-    modifier: Modifier = Modifier,
+    scroll: ChatScroll,
+    typing: Typing? = null,
 ) {
     when (history) {
         ChatHistory.Loading -> {
-            ChatHistoryStatus(stringResource(R.string.chat_loading), modifier)
+            ChatHistoryStatus(stringResource(R.string.chat_loading))
         }
 
         ChatHistory.Unavailable -> {
-            ChatHistoryStatus(stringResource(R.string.chat_unavailable), modifier)
+            ChatHistoryStatus(stringResource(R.string.chat_unavailable))
         }
 
         is ChatHistory.Content -> {
             if (history.items.isEmpty()) {
-                ChatHistoryStatus(stringResource(R.string.chat_empty), modifier)
+                ChatHistoryStatus(stringResource(R.string.chat_empty))
             } else {
                 val locale = LocalConfiguration.current.locales[0]
                 val formatter = remember(locale, zoneId) { timeSectionFormatter(locale, ZoneId.of(zoneId)) }
-                ChatTimeline(history.items, chat, listState, modifier) { formatter.format(it.startsAt) }
+                ChatTimeline(history.items, chat, scroll, typing) { formatter.format(it.startsAt) }
             }
         }
     }
 }
 
 @Composable
-private fun ChatHistoryStatus(
-    message: String,
-    modifier: Modifier,
-) {
+private fun ChatHistoryStatus(message: String) {
     Box(
-        modifier = modifier.fillMaxWidth().padding(16.dp),
+        modifier = Modifier.fillMaxSize().padding(16.dp),
         contentAlignment = Alignment.Center,
     ) {
         Text(
@@ -90,49 +91,79 @@ private val historyGutter = 16.dp
 private fun ChatTimeline(
     timeline: List<ChatTimelineItem>,
     chat: DemoChat,
-    listState: LazyListState,
-    modifier: Modifier,
+    scroll: ChatScroll,
+    typing: Typing?,
     timeLabel: (ChatTimelineItem.TimeSection) -> String,
 ) {
-    val latest = timeline.lastOrNull() as? ChatTimelineItem.Bubble
-    val previousLatestKey = remember { mutableStateOf(latest?.key) }
-    SideEffect {
-        val previous = previousLatestKey.value
-        val wasAtBottom =
-            previous != null &&
-                listState.firstVisibleItemScrollOffset == 0 &&
-                listState.layoutInfo.visibleItemsInfo
-                    .firstOrNull()
-                    ?.key == previous
-        val isNewReply = latest != null && !latest.isOutgoing && latest.key != previous
-        if (wasAtBottom && isNewReply) {
-            // In reverse layout a stable key can keep the previous last message pinned above a new reply.
-            listState.requestScrollToItem(0)
-        }
-        previousLatestKey.value = latest?.key
-    }
-    LazyColumn(
-        modifier = modifier.fillMaxSize(),
-        state = listState,
-        reverseLayout = true,
-        contentPadding = PaddingValues(horizontal = historyGutter, vertical = 12.dp),
-    ) {
-        items(
-            items = timeline.asReversed(),
-            key = ChatTimelineItem::key,
-            contentType = { it::class },
-        ) { item ->
-            when (item) {
-                is ChatTimelineItem.TimeSection -> {
-                    TimeHeader(timeLabel(item))
+    val newestFirst = remember(timeline) { timeline.asReversed() }
+    val showBottom = scroll.showBottomButton
+    Layout(
+        modifier = Modifier.fillMaxSize(),
+        content = {
+            LazyColumn(
+                state = scroll.list,
+                reverseLayout = true,
+                contentPadding = PaddingValues(horizontal = historyGutter, vertical = 12.dp),
+            ) {
+                if (typing != null) {
+                    item(key = TYPING_ITEM_KEY, contentType = TYPING_ITEM_KEY) {
+                        ChatTypingBubble(animate = typing == Typing.Animated)
+                    }
                 }
+                items(
+                    items = newestFirst,
+                    key = ChatTimelineItem::key,
+                    contentType = { it::class },
+                ) { item ->
+                    when (item) {
+                        is ChatTimelineItem.TimeSection -> {
+                            TimeHeader(timeLabel(item))
+                        }
 
-                is ChatTimelineItem.Bubble -> {
-                    val sender = if (item.isOutgoing) chat.currentUser else chat.otherUser
-                    MessageBubble(item, sender.displayName)
+                        is ChatTimelineItem.Bubble -> {
+                            val sender = if (item.isOutgoing) chat.currentUser else chat.otherUser
+                            MessageBubble(item, sender.displayName)
+                        }
+                    }
                 }
             }
+            if (showBottom) {
+                ScrollToBottomButton(scroll::requestBottom)
+            }
+        },
+    ) { children, constraints ->
+        val width = constraints.maxWidth
+        val height = constraints.maxHeight
+        val buttonSize = scrollButtonSize.roundToPx()
+        val buttonBelow = height >= 2 * buttonSize
+        // Put the control beside the history in a short window so it cannot consume the list's height.
+        val button =
+            if (height >= buttonSize && width >= 2 * buttonSize) {
+                children.getOrNull(1)?.measure(Constraints(maxWidth = width, maxHeight = height))
+            } else {
+                null
+            }
+        val listWidth = width - if (buttonBelow) 0 else button?.width ?: 0
+        val listHeight = height - if (buttonBelow) button?.height ?: 0 else 0
+        scroll.prepareMeasurement(timeline, typing != null, IntSize(width, height), listHeight)
+        val list = children.first().measure(Constraints.fixed(listWidth, listHeight))
+        layout(width, height) {
+            list.placeRelative(0, 0)
+            button?.placeRelative(width - button.width, height - button.height)
         }
+    }
+}
+
+@Composable
+private fun ScrollToBottomButton(onClick: () -> Unit) {
+    FilledTonalIconButton(
+        onClick = onClick,
+        modifier = Modifier.padding(end = historyGutter).size(scrollButtonSize),
+    ) {
+        Icon(
+            painter = painterResource(R.drawable.ic_chat_bottom),
+            contentDescription = stringResource(R.string.chat_scroll_to_bottom),
+        )
     }
 }
 
@@ -225,8 +256,7 @@ private fun PreviewChatHistory(history: ChatHistory) {
             history = history,
             chat = emptyPreviewChat.chat,
             zoneId = "UTC",
-            listState = rememberLazyListState(),
-            modifier = Modifier.fillMaxSize(),
+            scroll = rememberChatScroll(rememberLazyListState(), null) {},
         )
     }
 }

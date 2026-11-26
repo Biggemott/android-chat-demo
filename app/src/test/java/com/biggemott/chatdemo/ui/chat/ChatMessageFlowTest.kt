@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelStore
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import com.biggemott.chatdemo.data.DraftStore
 import com.biggemott.chatdemo.data.fixedDemoChat
 import com.biggemott.chatdemo.domain.ChatRepository
 import com.biggemott.chatdemo.domain.ConversationId
@@ -41,6 +42,7 @@ class ChatMessageFlowTest {
     private val dispatcher = StandardTestDispatcher()
     private val store = ViewModelStore()
     private val repository = RecordingRepository()
+    private val draftStore = ControlledDraftStore()
     private val delays = ArrayDeque<Long>()
     private var delaySelections = 0
     private lateinit var viewModel: ChatViewModel
@@ -51,7 +53,7 @@ class ChatMessageFlowTest {
         val factory =
             viewModelFactory {
                 initializer {
-                    ChatViewModel(repository) {
+                    ChatViewModel(repository, draftStore) {
                         delaySelections++
                         (delays.removeFirstOrNull() ?: 1_000).milliseconds
                     }
@@ -67,6 +69,86 @@ class ChatMessageFlowTest {
         dispatcher.scheduler.runCurrent()
         Dispatchers.resetMain()
     }
+
+    @Test
+    fun restoresExactTextWithoutWritingItBack() =
+        runTest {
+            val draft = "  مرحبا\n👋  "
+            draftStore.restored.complete(draft)
+            runCurrent()
+            assertEquals(draft, viewModel.uiState.value.draft)
+            assertTrue(viewModel.uiState.value.canSend)
+            assertTrue(draftStore.updates.isEmpty())
+        }
+
+    @Test
+    fun whitespaceRestoresButCannotBeSent() =
+        runTest {
+            draftStore.restored.complete(" \n\t")
+            runCurrent()
+            viewModel.onSend()
+            runCurrent()
+            assertEquals(" \n\t", viewModel.uiState.value.draft)
+            assertFalse(viewModel.uiState.value.canSend)
+            assertTrue(repository.attempts.isEmpty())
+        }
+
+    @Test
+    fun lateRestoreCannotReplaceAnEditOrResurrectAnAcceptedSend() =
+        runTest {
+            val commit = CompletableDeferred<Unit>()
+            repository.beforeCommit = { commit.await() }
+            send("  First  ")
+            send("Second")
+            assertEquals("", viewModel.uiState.value.draft)
+            draftStore.restored.complete("Old draft")
+            runCurrent()
+            assertEquals("", viewModel.uiState.value.draft)
+            assertEquals(listOf("  First  ", "", "Second", ""), draftStore.updates)
+            commit.complete(Unit)
+            runCurrent()
+            assertEquals(listOf("First", "Second"), repository.written.map { it.text })
+        }
+
+    @Test
+    fun restoreFailureKeepsNewInputUsable() =
+        runTest {
+            viewModel.onDraftChanged("New input")
+            draftStore.restored.completeExceptionally(IOException("Read failed"))
+            runCurrent()
+            assertEquals("New input", viewModel.uiState.value.draft)
+            assertTrue(viewModel.uiState.value.canSend)
+            assertEquals(listOf("New input"), draftStore.updates)
+        }
+
+    @Test
+    fun onlyVisibleFailedDraftsAreSaved() =
+        runTest {
+            repository.beforeCommit = { throw IOException("Write failed") }
+            send("  Recover immediately  ")
+            runCurrent()
+            assertEquals(listOf("  Recover immediately  ", "", "  Recover immediately  "), draftStore.updates)
+
+            send("Hold this")
+            viewModel.onDraftChanged("New edit")
+            runCurrent()
+            assertEquals("New edit", viewModel.uiState.value.draft)
+            assertEquals(listOf("Hold this", "", "New edit"), draftStore.updates.takeLast(3))
+            viewModel.onDraftChanged("")
+            viewModel.onRecoverDraft()
+            assertEquals(listOf("", "Hold this"), draftStore.updates.takeLast(2))
+        }
+
+    @Test
+    fun clearingViewModelCancelsPendingRestore() =
+        runTest {
+            assertTrue(draftStore.isRestoring)
+            store.clear()
+            runCurrent()
+            assertFalse(draftStore.isRestoring)
+            draftStore.restored.complete("Too late")
+            assertEquals("", viewModel.uiState.value.draft)
+        }
 
     @Test
     fun trimsAndClearsOnceBeforePersistenceAndUsesOnlyObservedRecords() =
@@ -412,5 +494,25 @@ class ChatMessageFlowTest {
             afterCommit(stored)
             return stored
         }
+    }
+}
+
+private class ControlledDraftStore : DraftStore {
+    val restored = CompletableDeferred<String>()
+    val updates = mutableListOf<String>()
+    var isRestoring = false
+        private set
+
+    override suspend fun restore(): String {
+        isRestoring = true
+        try {
+            return restored.await()
+        } finally {
+            isRestoring = false
+        }
+    }
+
+    override fun save(text: String) {
+        updates += text
     }
 }

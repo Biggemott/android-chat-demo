@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelStore
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import com.biggemott.chatdemo.data.DraftStore
 import com.biggemott.chatdemo.domain.ChatRepository
 import com.biggemott.chatdemo.domain.Conversation
 import com.biggemott.chatdemo.domain.ConversationId
@@ -188,7 +189,13 @@ class ChatViewModelTest {
 
                 override suspend fun sendMessage(message: NewMessage): Message = error("Presentation must not send messages")
             }
-        val factory = viewModelFactory { initializer { ChatViewModel(repository) { error("Unexpected reply") } } }
+        val draftStore =
+            object : DraftStore {
+                override suspend fun restore() = ""
+
+                override fun save(text: String) = Unit
+            }
+        val factory = viewModelFactory { initializer { ChatViewModel(repository, draftStore) { error("Unexpected reply") } } }
         return ViewModelProvider.create(store, factory)[ChatViewModel::class]
     }
 }

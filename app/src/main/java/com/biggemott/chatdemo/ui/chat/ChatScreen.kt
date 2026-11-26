@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.HorizontalDivider
@@ -23,27 +24,25 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.heading
-import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.biggemott.chatdemo.R
 import com.biggemott.chatdemo.ui.theme.ChatDemoTheme
-import kotlinx.coroutines.flow.first
 import java.time.ZoneId
 import java.time.ZoneOffset
+
+private val chatHeaderHeight = 56.dp
 
 @Composable
 internal fun ChatRoute(
@@ -52,32 +51,26 @@ internal fun ChatRoute(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val actions =
-        remember(viewModel) {
-            ChatActions(viewModel::onDraftChanged, viewModel::onSend, viewModel::onRecoverDraft, viewModel::onOutgoingScrolled)
+        remember(viewModel, onBack) {
+            ChatActions(
+                viewModel::onDraftChanged,
+                viewModel::onSend,
+                viewModel::onRecoverDraft,
+                viewModel::onOutgoingScrolled,
+                onBack,
+            )
         }
-    ChatScreen(state, onBack, actions)
+    ChatScreen(state, actions)
 }
 
 @Composable
 internal fun ChatScreen(
     state: ChatUiState,
-    onBack: () -> Unit,
     actions: ChatActions = ChatActions(),
     zone: ZoneId = ZoneId.systemDefault(),
+    listState: LazyListState = rememberLazyListState(),
+    animateTyping: Boolean = true,
 ) {
-    val listState = rememberLazyListState()
-    val history = state.history
-    val key = state.outgoingScrollKey
-    LaunchedEffect(history, key) {
-        if (key == null || history !is ChatHistory.Content) return@LaunchedEffect
-        val index = history.items.asReversed().indexOfFirst { it.key == key }
-        if (index < 0) return@LaunchedEffect
-        // Request the next measurement's index directly so stable keys and an in-progress drag cannot veto it.
-        listState.requestScrollToItem(index)
-        snapshotFlow { listState.layoutInfo.visibleItemsInfo.any { it.key == key } }.first { it }
-        actions.onOutgoingScrolled(key)
-    }
-
     Surface(modifier = Modifier.fillMaxSize()) {
         Column(
             modifier =
@@ -85,24 +78,21 @@ internal fun ChatScreen(
                     .fillMaxSize()
                     .windowInsetsPadding(WindowInsets.safeDrawing),
         ) {
-            ChatHeader(state.chat.otherUser.displayName, onBack)
-            ChatHistoryPane(
-                history = state.history,
-                chat = state.chat,
-                zoneId = zone.id,
-                modifier = Modifier.weight(1f),
-                listState = listState,
-            )
-            if (state.isReplyPending) {
-                Text(
-                    text = stringResource(R.string.chat_typing, state.chat.otherUser.displayName),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier =
-                        Modifier
-                            .padding(horizontal = 16.dp, vertical = 4.dp)
-                            .semantics { liveRegion = LiveRegionMode.Polite },
+            ChatHeader(state.chat.otherUser.displayName, actions.onBack)
+            Box(Modifier.weight(1f)) {
+                ChatHistoryPane(
+                    history = state.history,
+                    chat = state.chat,
+                    zoneId = zone.id,
+                    scroll = rememberChatScroll(listState, state.outgoingScrollKey, actions.onOutgoingScrolled),
+                    typing =
+                        when {
+                            !state.isReplyPending -> null
+                            animateTyping -> Typing.Animated
+                            else -> Typing.Static
+                        },
                 )
+                ChatTypingAnnouncement(state.chat.otherUser.displayName, state.isReplyPending, Modifier.align(Alignment.BottomStart))
             }
             ChatComposer(
                 draft = state.draft,
@@ -120,11 +110,32 @@ private fun ChatHeader(
     displayName: String,
     onBack: () -> Unit,
 ) {
+    val minimumWindowHeight = chatHeaderHeight + minimumComposerHeight() + scrollButtonSize
+    Column(
+        Modifier.layout { measurable, constraints ->
+            if (constraints.maxHeight < minimumWindowHeight.roundToPx()) {
+                layout(0, 0) {}
+            } else {
+                val header = measurable.measure(constraints)
+                layout(header.width, header.height) { header.placeRelative(0, 0) }
+            }
+        },
+    ) {
+        ChatHeaderContent(displayName, onBack)
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+    }
+}
+
+@Composable
+private fun ChatHeaderContent(
+    displayName: String,
+    onBack: () -> Unit,
+) {
     Row(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .heightIn(min = 56.dp)
+                .heightIn(min = chatHeaderHeight)
                 .padding(start = 4.dp, end = 16.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -156,7 +167,6 @@ private fun ChatHeader(
             modifier = Modifier.semantics { heading() },
         )
     }
-    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
 }
 
 @Preview(name = "Light", widthDp = 393, heightDp = 760, locale = "en")
@@ -183,14 +193,22 @@ private fun LargeTextPreview() = PreviewChatScreen(seededPreviewChat(lastMessage
 @Composable
 private fun PendingReplyPreview() = PreviewChatScreen(pendingReplyPreviewChat())
 
+@Preview(name = "Older history and multiline draft", widthDp = 393, heightDp = 440, locale = "en")
 @Composable
-private fun PreviewChatScreen(state: ChatUiState) {
+private fun ReadingHistoryPreview() = PreviewChatScreen(seededPreviewChat().copy(draft = PREVIEW_TALL_DRAFT), firstVisibleIndex = 2)
+
+@Composable
+private fun PreviewChatScreen(
+    state: ChatUiState,
+    firstVisibleIndex: Int = 0,
+) {
     ChatDemoTheme {
         ChatScreen(
             state = state,
-            onBack = {},
             actions = ChatActions(onSend = {}),
             zone = ZoneOffset.UTC,
+            listState = rememberLazyListState(initialFirstVisibleItemIndex = firstVisibleIndex),
+            animateTyping = false,
         )
     }
 }
