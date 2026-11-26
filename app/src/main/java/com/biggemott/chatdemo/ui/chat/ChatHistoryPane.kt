@@ -20,8 +20,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.AbsoluteAlignment
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -31,8 +31,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.Constraints
-import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import com.biggemott.chatdemo.R
 import com.biggemott.chatdemo.domain.DemoChat
@@ -85,7 +83,6 @@ private fun ChatHistoryStatus(message: String) {
 }
 
 private const val BUBBLE_WIDTH_FRACTION = 0.8f
-private val historyGutter = 16.dp
 
 @Composable
 private fun ChatTimeline(
@@ -96,69 +93,50 @@ private fun ChatTimeline(
     timeLabel: (ChatTimelineItem.TimeSection) -> String,
 ) {
     val newestFirst = remember(timeline) { timeline.asReversed() }
-    val showBottom = scroll.showBottomButton
-    Layout(
-        modifier = Modifier.fillMaxSize(),
-        content = {
-            LazyColumn(
-                state = scroll.list,
-                reverseLayout = true,
-                contentPadding = PaddingValues(horizontal = historyGutter, vertical = 12.dp),
-            ) {
-                if (typing != null) {
-                    item(key = TYPING_ITEM_KEY, contentType = TYPING_ITEM_KEY) {
-                        ChatTypingBubble(animate = typing == Typing.Animated)
-                    }
+    scroll.ApplyRequests(timeline, typing != null)
+    Box(Modifier.fillMaxSize().onSizeChanged(scroll::onViewportChanged)) {
+        LazyColumn(
+            modifier = Modifier.matchParentSize(),
+            state = scroll.list,
+            reverseLayout = true,
+            contentPadding = PaddingValues(horizontal = historyGutter, vertical = historyVerticalPadding),
+        ) {
+            if (typing != null) {
+                item(key = TYPING_ITEM_KEY, contentType = TYPING_ITEM_KEY) {
+                    ChatTypingBubble(animate = typing == Typing.Animated)
                 }
-                items(
-                    items = newestFirst,
-                    key = ChatTimelineItem::key,
-                    contentType = { it::class },
-                ) { item ->
-                    when (item) {
-                        is ChatTimelineItem.TimeSection -> {
-                            TimeHeader(timeLabel(item))
-                        }
+            }
+            items(
+                items = newestFirst,
+                key = ChatTimelineItem::key,
+                contentType = { it::class },
+            ) { item ->
+                when (item) {
+                    is ChatTimelineItem.TimeSection -> {
+                        TimeHeader(timeLabel(item))
+                    }
 
-                        is ChatTimelineItem.Bubble -> {
-                            val sender = if (item.isOutgoing) chat.currentUser else chat.otherUser
-                            MessageBubble(item, sender.displayName)
-                        }
+                    is ChatTimelineItem.Bubble -> {
+                        val sender = if (item.isOutgoing) chat.currentUser else chat.otherUser
+                        MessageBubble(item, sender.displayName)
                     }
                 }
             }
-            if (showBottom) {
-                ScrollToBottomButton(scroll::requestBottom)
-            }
-        },
-    ) { children, constraints ->
-        val width = constraints.maxWidth
-        val height = constraints.maxHeight
-        val buttonSize = scrollButtonSize.roundToPx()
-        val buttonBelow = height >= 2 * buttonSize
-        // Put the control beside the history in a short window so it cannot consume the list's height.
-        val button =
-            if (height >= buttonSize && width >= 2 * buttonSize) {
-                children.getOrNull(1)?.measure(Constraints(maxWidth = width, maxHeight = height))
-            } else {
-                null
-            }
-        val listWidth = width - if (buttonBelow) 0 else button?.width ?: 0
-        val listHeight = height - if (buttonBelow) button?.height ?: 0 else 0
-        scroll.prepareMeasurement(timeline, typing != null, IntSize(width, height), listHeight)
-        val list = children.first().measure(Constraints.fixed(listWidth, listHeight))
-        layout(width, height) {
-            list.placeRelative(0, 0)
-            button?.placeRelative(width - button.width, height - button.height)
+        }
+        if (scroll.showBottomButton) {
+            ScrollToBottomButton(scroll::requestBottom, Modifier.align(Alignment.BottomEnd))
         }
     }
 }
 
 @Composable
-private fun ScrollToBottomButton(onClick: () -> Unit) {
+private fun ScrollToBottomButton(
+    onClick: () -> Unit,
+    modifier: Modifier,
+) {
     FilledTonalIconButton(
         onClick = onClick,
-        modifier = Modifier.padding(end = historyGutter).size(scrollButtonSize),
+        modifier = modifier.padding(end = historyGutter).size(scrollButtonSize),
     ) {
         Icon(
             painter = painterResource(R.drawable.ic_chat_bottom),

@@ -1,9 +1,11 @@
 package com.biggemott.chatdemo.ui.chat
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -22,7 +24,6 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -59,42 +60,30 @@ internal fun ChatComposer(
     sendError: Boolean = false,
     onRecoverDraft: (() -> Unit)? = null,
 ) {
-    val minimumHeight = minimumComposerHeight()
-    // In a short window the field scrolls internally, leaving part of the conversation on screen.
-    Column(
-        Modifier.layout { measurable, constraints ->
-            val historySpace =
-                if (constraints.hasBoundedHeight) {
-                    val editor = minimumHeight.roundToPx()
-                    val withError = editor + minimumErrorHeight.roundToPx()
-                    val reserved = if (sendError && constraints.maxHeight >= withError) withError else editor
-                    val protectedHeight = maxOf(constraints.minHeight, reserved)
-                    minOf(96.dp.roundToPx(), constraints.maxHeight / 2, (constraints.maxHeight - protectedHeight).coerceAtLeast(0))
-                } else {
-                    0
-                }
-            val composer = measurable.measure(constraints.copy(maxHeight = constraints.maxHeight - historySpace))
-            layout(composer.width, composer.height) { composer.placeRelative(0, 0) }
-        },
-    ) {
-        ComposerContent(draft, onDraftChanged, onSend, sendError, onRecoverDraft)
+    val editorHeight = minimumComposerHeight()
+    BoxWithConstraints {
+        val showError = sendError && maxHeight >= editorHeight + minimumErrorHeight
+        val minimumFooter = editorHeight + if (showError) minimumErrorHeight else 0.dp
+        val historySpace = minOf(96.dp, maxHeight / 2, (maxHeight - minimumFooter).coerceAtLeast(0.dp))
+        val footerHeight = maxHeight - historySpace
+        Column(Modifier.heightIn(max = footerHeight)) {
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            if (showError) {
+                SendError(draft.isEmpty(), onRecoverDraft, Modifier.heightIn(max = footerHeight - editorHeight))
+            }
+            ComposerInput(draft, onDraftChanged, onSend)
+        }
     }
 }
 
 @Composable
-private fun ComposerContent(
+private fun ComposerInput(
     draft: String,
     onDraftChanged: (String) -> Unit,
     onSend: (() -> Unit)?,
-    sendError: Boolean,
-    onRecoverDraft: (() -> Unit)?,
 ) {
     val colors = MaterialTheme.colorScheme
     val hint = stringResource(R.string.chat_message_hint)
-    HorizontalDivider(color = colors.outlineVariant)
-    if (sendError) {
-        SendError(draft.isEmpty(), onRecoverDraft)
-    }
     Row(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = composerRowPadding),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -135,23 +124,11 @@ private fun ComposerContent(
 private fun SendError(
     isComposerEmpty: Boolean,
     onRecoverDraft: (() -> Unit)?,
+    modifier: Modifier,
 ) {
-    val editorHeight = minimumComposerHeight() - 1.dp
     Row(
         modifier =
-            Modifier
-                .layout { measurable, constraints ->
-                    val available = constraints.maxHeight - editorHeight.roundToPx()
-                    // Keep the input usable until there is room again for the recovery prompt.
-                    if (constraints.hasBoundedHeight && available < minimumErrorHeight.roundToPx()) {
-                        layout(0, 0) {}
-                    } else {
-                        val budget = if (constraints.hasBoundedHeight) constraints.copy(maxHeight = available) else constraints
-                        val error = measurable.measure(budget)
-                        layout(error.width, error.height) { error.placeRelative(0, 0) }
-                    }
-                }.fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 4.dp),
+            modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(

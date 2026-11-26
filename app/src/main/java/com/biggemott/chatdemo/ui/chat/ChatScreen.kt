@@ -4,6 +4,7 @@ import android.content.res.Configuration
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
@@ -28,7 +29,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.layout.layout
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -110,19 +110,15 @@ private fun ChatHeader(
     displayName: String,
     onBack: () -> Unit,
 ) {
-    val minimumWindowHeight = chatHeaderHeight + minimumComposerHeight() + scrollButtonSize
-    Column(
-        Modifier.layout { measurable, constraints ->
-            if (constraints.maxHeight < minimumWindowHeight.roundToPx()) {
-                layout(0, 0) {}
-            } else {
-                val header = measurable.measure(constraints)
-                layout(header.width, header.height) { header.placeRelative(0, 0) }
+    val minimumHistoryRoom = 48.dp
+    val minimumWindowHeight = chatHeaderHeight + minimumComposerHeight() + minimumHistoryRoom
+    BoxWithConstraints {
+        if (maxHeight >= minimumWindowHeight) {
+            Column {
+                ChatHeaderContent(displayName, onBack)
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
             }
-        },
-    ) {
-        ChatHeaderContent(displayName, onBack)
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+        }
     }
 }
 
