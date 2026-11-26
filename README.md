@@ -4,16 +4,33 @@ Chat Demo is a single-module native Android project for an offline conversation 
 
 ## Build and test
 
-Use Android Studio or the Gradle wrapper with JDK 25 and Android SDK 37. The minimum Android version is API 26. Dependency and plugin pins are in [the version catalog](gradle/libs.versions.toml).
+Use Android Studio or the Gradle wrapper with JDK 25, Android SDK Platform 37.1 and Build Tools 36.0.0. The app targets Android 17 (API 37) and supports Android 8.0 (API 26) and newer. Dependency and plugin pins are in [the version catalog](gradle/libs.versions.toml).
 
-The project uses Compose BOM 2026.09.00 with compile SDK 37.0. The newer stable BOM 2026.11.01 requires compile SDK 37.1 or later.
+The project uses stable Compose BOM 2026.11.01 with its minimum compile SDK 37.1. AGP 9.5.2, Gradle 9.6.0, and Kotlin 2.4.21 remain pinned as a tested set.
 
 ```powershell
 .\gradlew.bat verifyProject
-.\gradlew.bat connectedDebugAndroidTest
+.\gradlew.bat :app:assembleRelease
 ```
 
-The fast gate runs ktlint, Detekt, Android Lint, JVM tests including screenshot comparisons, and debug assembly. It checks formatting without changing source files. Detekt runs the stable CLI against handwritten Kotlin with its own compiler and without type resolution. On macOS or Linux, use `./gradlew` in place of `.\gradlew.bat`. The connected tests require a running emulator or connected device. To open the app, select a device and run the `app` configuration in Android Studio.
+The fast gate runs ktlint, Detekt, Android Lint, JVM tests including screenshot comparisons, and debug assembly. It checks formatting without changing source files. Detekt 1.23.8 runs its CLI against handwritten Kotlin without type resolution. Its stable Android plugin targets AGP 8 and Kotlin 2.0 and does not register a type-aware debug task in this project's AGP 9.5.2 build. On macOS or Linux, use `./gradlew` in place of `.\gradlew.bat`. To open the app, select a device and run the `app` configuration in Android Studio.
+
+### Device checks and CI
+
+Run the full connected suite on API 26 and API 37 separately. Use fresh emulators so installation starts with empty app data. The opt-in Gradle property builds the debug APK under an isolated application ID. The startup smoke test checks that ID before opening the real MainActivity with its production Hilt bindings and seeded Room history. Normal debug and release builds keep the standard application ID.
+
+```powershell
+$env:ANDROID_SERIAL = "emulator-5554" # Set this to the serial from adb devices.
+adb -s $env:ANDROID_SERIAL shell getprop ro.build.version.sdk
+$results = Join-Path ([IO.Path]::GetTempPath()) ("chat-connected-" + [guid]::NewGuid())
+.\gradlew.bat :app:connectedDebugAndroidTest -PisolatedInstrumentedTests "-PconnectedResultsDir=$results"
+if ($LASTEXITCODE -ne 0) { throw "Connected tests failed" }
+py -3 .github/scripts/validate_connected.py $results $env:ANDROID_SERIAL
+```
+
+On Linux, set `ANDROID_SERIAL` and `EXPECTED_ANDROID_API` and run `bash .github/scripts/run-connected.sh` (Python 3 required). A reused emulator can fail APK installation while Gradle still exits successfully. Check fresh XML for the selected device, at least 35 distinct executed cases, and zero failures, errors, or skips.
+
+In the repository's **Actions** tab, **Fast checks** runs `verifyProject` on Ubuntu 24.04 with Temurin JDK 25, and **Instrumentation** runs independent API 26 and 37 emulator jobs. Both run on pushes and pull requests and support **Run workflow**. Inspect the check results for the commit under review and download diagnostics from a failed run. The local IDE inspection workflow is separate.
 
 ### Change the app language
 
@@ -79,7 +96,7 @@ The composer follows system-bar and keyboard insets, opens up to five visible li
 
 JVM tests cover timeline boundaries, authorship, stable keys, localized time labels, and ViewModel transitions. Virtual-time tests exercise draft restoration and edit races, rapid sends, failure recovery, reply replacement across locales, deadline ordering, script cycling, and lifecycle cancellation. Data integration tests use isolated Room and Preferences DataStore files and cover chronological order, observable updates, durability, and draft write failure recovery. Compose instrumentation covers scroll priority, history position across recreation, typing and message semantics, RTL control placement, bidirectional paragraphs, compact recovery at 200% font scale, and time-zone refresh. The test APK uses stable Espresso 3.7.0 for compatibility with Android 17.
 
-Roborazzi on Robolectric checks deterministic images in [the screenshot baseline directory](app/src/test/screenshots). The captures use a fixed virtual device, Android API, locale, theme, font scale, and UTC seed timestamps. Private Compose previews sit beside their components and use the same fixtures. Stable Paparazzi 1.3.5 cannot run with this project's AGP 9.5 setup because its plugin requires the removed `BaseExtension`.
+Roborazzi on Robolectric checks deterministic images in [the screenshot baseline directory](app/src/test/screenshots). The captures use native graphics, a fixed virtual device, Android API 35, locale, theme, font scale, and UTC seed timestamps. All 11 Windows baselines matched decoded pixels from Ubuntu 24.04 with Temurin 25.0.5.1+2, the fast workflow environment. Private Compose previews sit beside their components and use the same fixtures. Stable Paparazzi 1.3.5 cannot run with this project's AGP 9.5 setup because its plugin requires the removed `BaseExtension`.
 
 ```powershell
 .\gradlew.bat :app:verifyRoborazziDebug
