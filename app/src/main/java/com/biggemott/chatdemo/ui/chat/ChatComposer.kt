@@ -86,12 +86,13 @@ internal fun ChatComposer(
         val heightBelowHeader = maxHeight - headerSpace
         val historySpace = headerSpace + minOf(96.dp, heightBelowHeader / 2, (heightBelowHeader - minimumFooter).coerceAtLeast(0.dp))
         val footerHeight = maxHeight - historySpace
+        val compactEditor = maxHeight < editorHeight
         Column(Modifier.heightIn(max = footerHeight)) {
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
             if (errorLayout != null) {
                 SendError(errorLayout, isComposerEmpty, onRecoverDraft, Modifier.heightIn(max = footerHeight - editorHeight))
             }
-            ComposerInput(draft, onDraftChanged, onSend)
+            ComposerInput(draft, onDraftChanged, onSend, compact = compactEditor)
         }
     }
 }
@@ -101,13 +102,14 @@ private fun ComposerInput(
     draft: String,
     onDraftChanged: (String) -> Unit,
     onSend: (() -> Unit)?,
+    compact: Boolean,
 ) {
     val colors = MaterialTheme.colorScheme
     val hint = stringResource(R.string.chat_message_hint)
     Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = composerSidePadding, vertical = composerRowPadding),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = composerSidePadding, vertical = if (compact) 0.dp else composerRowPadding),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
-        verticalAlignment = Alignment.Bottom,
+        verticalAlignment = if (compact) Alignment.CenterVertically else Alignment.Bottom,
     ) {
         OutlinedTextField(
             value = draft,
@@ -122,7 +124,7 @@ private fun ComposerInput(
         FilledIconButton(
             onClick = { onSend?.invoke() },
             enabled = onSend != null,
-            modifier = Modifier.padding(bottom = 4.dp).size(minimumTouchTarget),
+            modifier = Modifier.padding(bottom = if (compact) 0.dp else 4.dp).size(minimumTouchTarget),
             shape = CircleShape,
             colors =
                 IconButtonDefaults.filledIconButtonColors(

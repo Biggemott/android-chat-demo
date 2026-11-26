@@ -177,7 +177,10 @@ class ArabicChatLayoutTest {
         val editor = compose.onNodeWithContentDescription("رسالة").fetchSemanticsNode().boundsInRoot
         val send = compose.onNodeWithContentDescription("إرسال الرسالة").fetchSemanticsNode().boundsInRoot
         val minTarget = with(compose.density) { 48.dp.roundToPx() }
-        assertTrue("Editor height ${editor.height} px must fit a $readableFieldHeight px text line with padding", editor.height + 1 >= readableFieldHeight)
+        assertTrue(
+            "Editor height ${editor.height} px must fit a $readableFieldHeight px text line with padding",
+            editor.height + 1 >= readableFieldHeight,
+        )
         assertTrue("Send retains its target in the short viewport", send.height >= minTarget && send.width >= minTarget)
     }
 
