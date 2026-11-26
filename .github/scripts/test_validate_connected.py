@@ -47,7 +47,9 @@ class ConnectedResultsTest(unittest.TestCase):
 
     def test_rejects_missing_results_even_if_old_report_exists_elsewhere(self):
         self.write_report()
-        self.report.rename(self.directory.parent / self.directory.name / "old-report.bak")
+        old_report = self.directory / "previous-run" / "connected" / "debug" / self.report.name
+        old_report.parent.mkdir(parents=True)
+        self.report.rename(old_report)
         self.assertNotEqual(self.validate().returncode, 0)
 
     def test_rejects_empty_and_malformed_xml(self):

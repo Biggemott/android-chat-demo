@@ -1,0 +1,66 @@
+name: Instrumentation
+
+on: [push, pull_request, workflow_dispatch]
+
+permissions:
+  contents: read
+
+jobs:
+  connected:
+    name: Connected tests (API ${{ matrix.api }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - api: 26
+            platform: '26'
+            image: '26'
+            target: google_apis_playstore
+            arch: x86
+          - api: 37
+            platform: '37.1'
+            image: '37.2'
+            target: google_apis_playstore_ps16k
+            arch: x86_64
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
+        with:
+          distribution: temurin
+          java-version: '25.0.5+1.2'
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+        with:
+          cache-provider: basic
+      - name: Install compile SDK
+        run: sdkmanager --install 'platforms;android-37.1' 'build-tools;36.0.0'
+      - name: Enable KVM
+        run: |
+          test -c /dev/kvm
+          sudo setfacl -m "u:$(id -un):rw" /dev/kvm
+          test -r /dev/kvm
+          test -w /dev/kvm
+      - name: Run connected suite on a fresh emulator
+        uses: ReactiveCircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
+        env:
+          EXPECTED_ANDROID_API: ${{ matrix.api }}
+        with:
+          api-level: ${{ matrix.platform }}
+          system-image-api-level: ${{ matrix.image }}
+          target: ${{ matrix.target }}
+          arch: ${{ matrix.arch }}
+          emulator-options: -no-window -gpu swiftshader -no-snapshot -no-audio -no-boot-anim
+          disable-linux-hw-accel: false
+          script: bash .github/scripts/run-connected.sh
+      - name: Upload failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: instrumentation-api-${{ matrix.api }}
+          path: |
+            ${{ runner.temp }}/connected-*/
+            app/build/reports/androidTests/
+          retention-days: 7

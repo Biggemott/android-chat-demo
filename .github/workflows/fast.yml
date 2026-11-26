@@ -1,0 +1,40 @@
+name: Fast checks
+
+on: [push, pull_request, workflow_dispatch]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
+        with:
+          distribution: temurin
+          java-version: '25.0.5+1.2'
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+        with:
+          cache-provider: basic
+      - name: Install Android SDK packages
+        run: sdkmanager --install 'platforms;android-37.1' 'build-tools;36.0.0'
+      - name: Test the instrumentation report validator
+        run: python3 -B .github/scripts/test_validate_connected.py
+      - name: Run the fast gate
+        run: bash ./gradlew verifyProject --console=plain --stacktrace 2>&1 | tee "$RUNNER_TEMP/verify-project.log"
+        shell: bash
+      - name: Upload failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: fast-check-diagnostics
+          path: |
+            ${{ runner.temp }}/verify-project.log
+            app/build/reports/
+            app/build/test-results/
+            app/build/outputs/roborazzi/
+          retention-days: 7
