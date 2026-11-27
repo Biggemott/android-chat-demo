@@ -6,7 +6,7 @@ Chat Demo is a single-module native Android project for an offline conversation 
 
 Use Android Studio or the Gradle wrapper with JDK 25, Android SDK Platform 37.1 and Build Tools 36.0.0. The app targets Android 17 (API 37) and supports Android 8.0 (API 26) and newer. Dependency and plugin pins are in [the version catalog](gradle/libs.versions.toml).
 
-The project uses stable Compose BOM 2026.11.01 with its minimum compile SDK 37.1. AGP 9.5.2, Gradle 9.6.0, and Kotlin 2.4.21 remain pinned as a tested set.
+Compose BOM 2026.11.01 requires compile SDK 37.1. AGP 9.5.2, Gradle 9.6.0, and Kotlin 2.4.21 remain pinned as a tested set. Lint may suggest a newer AGP patch and flag the app-language manifest attribute, which Android supports from API 33.
 
 ```powershell
 .\gradlew.bat verifyProject
@@ -107,7 +107,7 @@ Use the record task for an intentional visual change and review the new images b
 
 ## Assumptions and limits
 
-The demo is local to a single installation. The intended conversation has exactly two fixed participants. Timestamps are stored at millisecond precision, with generated IDs providing deterministic ordering within the same millisecond. Moving the device clock backwards can place new messages earlier in the timeline.
+Timestamps are stored at millisecond precision, with generated IDs breaking ties. Moving the device clock backwards can place new messages earlier in the timeline. Exceptionally large messages can exceed Android database cursor or rendering limits. If history observation fails, the screen shows an unavailable state and keeps the draft. Observation restarts with a new ViewModel.
 
 The app disables Android Auto Backup and explicitly excludes its database directory and `files/datastore/` directory from legacy backup, cloud backup, and Android device-to-device transfer where the platform applies those rules. Device makers can handle transfer differently. [Android backup behavior](https://developer.android.com/identity/data/autobackup)
 
