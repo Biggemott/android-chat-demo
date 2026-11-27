@@ -63,7 +63,7 @@ The typing bubble is a transient list row with a stable key. A persistent polite
 
 Use the SDK and JDK from [Getting started](../README.md#getting-started). AGP 9.5.2, Gradle 9.6.0, and Kotlin 2.4.21 are pinned as a tested set. Compose BOM 2026.11.01 requires compile SDK 37.1. The stable Espresso 3.7.0 constraint avoids reflection on an input API removed in Android 17. The Lifecycle runtime constraint avoids older transitive lint checks that use obsolete lint APIs. Versions are in the [catalog](../gradle/libs.versions.toml).
 
-Detekt 1.23.8 runs its CLI on handwritten Kotlin without type resolution. The stable Gradle plugin targets AGP 8 and Kotlin 2.0 and does not register a type-aware debug task on this build. Roborazzi runs with Robolectric. Paparazzi 1.3.5 requires Gradle's removed Android `BaseExtension` API and is incompatible with this AGP setup.
+Detekt 1.23.8 runs as an isolated CLI on handwritten Kotlin without type resolution. This keeps the analyzer's Kotlin compiler separate from the app build and works with the pinned Android Gradle Plugin. Roborazzi runs screenshot comparisons with Robolectric.
 
 - Android Lint's `AndroidGradlePluginVersion` advisory reflects the deliberate AGP pin. The `UnusedAttribute` warning for `android:localeConfig` reflects the API 26 minimum. Android reads the attribute for per-app language preferences from API 33, and earlier releases use the device language.
 - Android Studio flags incubating Gradle APIs in the Detekt configuration and repository policy. The pinned Gradle build exercises those APIs. Its manifest warning has the same API-level rationale as Lint. The repeated Compose BOM inspection is informational and refers to distinct production, screenshot, and instrumentation configurations.
@@ -114,9 +114,15 @@ Both GitHub Actions workflows run on pushes and pull requests and support manual
 
 ### Runtime checks
 
-A bounded API 37 emulator check used a minified release APK signed with a disposable key. It exercised production startup, send and reply, restoration of committed history and a completed draft after process death, and Home or sleep followed by return while the process was still alive. It also checked Gboard multiline entry and editing, system bar, cutout and keyboard insets, and configuration changes involving orientation, font scale, theme, and locale.
+API 37 emulator verification of the minified release covered startup, sending and receiving a reply, restoration of committed history and a saved draft after process death, and returning from Home or sleep with the process still alive. It also covered multiline editing with Gboard, system bar, display cutout and keyboard insets, and changes to orientation, font scale, theme, and locale.
 
-On the same emulator, a debug run with 1,000 total messages, including the eight seed messages, exercised initial positioning, reading older history while a reply arrived, jumping back to the latest message, sending, and cold reopen. These exploratory checks were run outside CI on one emulator configuration. Manual TalkBack speech, gestures, and focus checks are pending.
+A debug build with a synthetic 1,000-message conversation opened at the latest message, kept older history visible after a reply arrived, jumped back to the latest message on request, and retained new messages after a cold restart. These runtime checks were performed outside the CI suite on one emulator configuration.
+
+### Accessibility verification
+
+Manual TalkBack verification on a physical Android device covered English reading and traversal, sending and typing announcements, navigation to the latest message, and Arabic RTL and spoken content. Automated Compose tests cover message and heading semantics, the typing live region, RTL placement, and compact layouts.
+
+API 37 emulator verification confirmed usable composition and sending in Arabic RTL with 200% font scaling, dark theme, landscape, and the software keyboard visible. The compact editor scrolled between lines of the mixed-direction draft. The sent message stayed right-aligned and the Arabic reply stayed left-aligned. After returning to portrait, the latest-message control brought both into view and the composer accepted further edits.
 
 ### Optional local IDE inspections
 
