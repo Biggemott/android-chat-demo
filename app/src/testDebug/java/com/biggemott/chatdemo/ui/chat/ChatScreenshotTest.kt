@@ -47,6 +47,10 @@ class ChatScreenshotTest {
 
     @Test
     fun sendError() = capture("send-error", seededPreviewChat().copy(sendError = true, canRecoverDraft = true))
+
+    @Test
+    fun historyUnavailable() =
+        capture("history-unavailable", emptyPreviewChat.copy(history = ChatHistory.Unavailable, draft = PREVIEW_DRAFT))
 }
 
 @RunWith(RobolectricTestRunner::class)
@@ -69,6 +73,16 @@ class ArabicChatScreenshotTest {
             arabicPreviewChat().copy(sendError = true, canRecoverDraft = true),
             fontScale = 2f,
             firstVisibleIndex = 2,
+        )
+
+    @Test
+    @Config(qualifiers = "ar-rEG-w540dp-h220dp-land-night-mdpi")
+    fun arabicCompactHistoryUnavailable() =
+        capture(
+            "arabic-compact-history-unavailable",
+            arabicPreviewChat().copy(history = ChatHistory.Unavailable),
+            darkTheme = true,
+            fontScale = 2f,
         )
 }
 

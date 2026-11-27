@@ -16,7 +16,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -70,6 +72,17 @@ class ChatViewModel
         private var replyJob: Job? = null
         private var replyIndex = 0
 
+        private val historyObservation =
+            flow { emitAll(repository.observeMessages(chat.conversation.id)) }
+                .map<List<Message>, ChatHistory> { messages ->
+                    ChatHistory.Content(mapChatTimeline(messages, chat.currentUser.id))
+                }.catch { failure ->
+                    if (failure is CancellationException || failure !is Exception) throw failure
+                    emit(ChatHistory.Unavailable)
+                }.onEach { history ->
+                    mutableUiState.update { it.copy(history = history) }
+                }
+
         init {
             viewModelScope.launch {
                 try {
@@ -79,22 +92,20 @@ class ChatViewModel
                     logger.warning("Could not restore chat draft (${failure.javaClass.simpleName})")
                 }
             }
-            viewModelScope.launch {
-                flow { emitAll(repository.observeMessages(chat.conversation.id)) }
-                    .map<List<Message>, ChatHistory> { messages ->
-                        ChatHistory.Content(mapChatTimeline(messages, chat.currentUser.id))
-                    }.catch { failure ->
-                        if (failure is CancellationException || failure !is Exception) throw failure
-                        emit(ChatHistory.Unavailable)
-                    }.collect { history ->
-                        mutableUiState.update { it.copy(history = history) }
-                    }
-            }
+            historyObservation.launchIn(viewModelScope)
         }
 
         override fun onCleared() {
             // A reply cancelled before launch never enters its finally block.
             mutableUiState.update { it.copy(isReplyPending = false) }
+        }
+
+        @MainThread
+        fun onRetryHistory() {
+            // Unavailable is emitted after the failed upstream has unwound. Claim Loading before launching again.
+            if (mutableUiState.value.history != ChatHistory.Unavailable) return
+            mutableUiState.update { it.copy(history = ChatHistory.Loading) }
+            historyObservation.launchIn(viewModelScope)
         }
 
         @MainThread

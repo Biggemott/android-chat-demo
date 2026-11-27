@@ -65,26 +65,28 @@ private fun minimumComposerHeight(): Dp {
 
 @Composable
 internal fun ChatComposer(
-    draft: String,
+    state: ChatUiState,
     onDraftChanged: (String) -> Unit,
     onSend: (() -> Unit)?,
-    sendError: Boolean = false,
     onRecoverDraft: (() -> Unit)? = null,
 ) {
     val editorHeight = minimumComposerHeight()
     val canRecover = onRecoverDraft != null
-    val isComposerEmpty = draft.isEmpty()
+    val isComposerEmpty = state.draft.isEmpty()
     BoxWithConstraints {
+        val retrySpace =
+            if (state.history == ChatHistory.Unavailable && maxHeight >= editorHeight + minimumTouchTarget) minimumTouchTarget else 0.dp
         val errorLayout =
-            if (sendError) {
-                measureSendError(isComposerEmpty, canRecover, maxWidth, maxHeight - editorHeight)
+            if (state.sendError) {
+                measureSendError(isComposerEmpty, canRecover, maxWidth, maxHeight - editorHeight - retrySpace)
             } else {
                 null
             }
         val minimumFooter = editorHeight + (errorLayout?.height ?: 0.dp)
         val headerSpace = if (maxHeight >= minimumFooter + chatHeaderExtent + scrollButtonSize) chatHeaderExtent else 0.dp
         val heightBelowHeader = maxHeight - headerSpace
-        val historySpace = headerSpace + minOf(96.dp, heightBelowHeader / 2, (heightBelowHeader - minimumFooter).coerceAtLeast(0.dp))
+        val preferredHistory = minOf(96.dp, heightBelowHeader / 2, (heightBelowHeader - minimumFooter).coerceAtLeast(0.dp))
+        val historySpace = headerSpace + maxOf(retrySpace, preferredHistory)
         val footerHeight = maxHeight - historySpace
         val compactEditor = maxHeight < editorHeight
         Column(Modifier.heightIn(max = footerHeight)) {
@@ -92,7 +94,7 @@ internal fun ChatComposer(
             if (errorLayout != null) {
                 SendError(errorLayout, isComposerEmpty, onRecoverDraft, Modifier.heightIn(max = footerHeight - editorHeight))
             }
-            ComposerInput(draft, onDraftChanged, onSend, compact = compactEditor)
+            ComposerInput(state.draft, onDraftChanged, onSend, compact = compactEditor)
         }
     }
 }
@@ -279,10 +281,9 @@ private fun PreviewChatComposer(
         Surface {
             Column {
                 ChatComposer(
-                    draft = draft,
+                    state = emptyPreviewChat.copy(draft = draft, sendError = sendError),
                     onDraftChanged = {},
                     onSend = if (draft.isNotBlank()) ({}) else null,
-                    sendError = sendError,
                     onRecoverDraft = if (sendError) ({}) else null,
                 )
             }

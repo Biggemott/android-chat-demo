@@ -5,7 +5,7 @@ from xml.etree import ElementTree as ET
 
 
 # Update this floor when adding or intentionally removing instrumented cases.
-MINIMUM_TESTS = 35
+MINIMUM_TESTS = 36
 
 
 def validate(report_directory, serial):

@@ -15,7 +15,7 @@ class ConnectedResultsTest(unittest.TestCase):
         self.report = self.directory / "connected" / "debug" / "TEST-device.xml"
         self.report.parent.mkdir(parents=True)
 
-    def write_report(self, count=35, serial="emulator-5554", outcome=None):
+    def write_report(self, count=36, serial="emulator-5554", outcome=None):
         totals = dict(tests=str(count), failures="0", errors="0", skipped="0")
         if outcome:
             totals[{"failure": "failures", "error": "errors", "skipped": "skipped"}[outcome]] = "1"
@@ -39,7 +39,7 @@ class ConnectedResultsTest(unittest.TestCase):
     def test_accepts_complete_report(self):
         result = self.validate_after_report()
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn("35 tests passed", result.stdout)
+        self.assertIn("36 tests passed", result.stdout)
 
     def validate_after_report(self, **kwargs):
         self.write_report(**kwargs)
@@ -59,7 +59,7 @@ class ConnectedResultsTest(unittest.TestCase):
                 self.assertNotEqual(self.validate().returncode, 0)
 
     def test_rejects_zero_and_low_counts(self):
-        for count in (0, 34):
+        for count in (0, 35):
             with self.subTest(count=count):
                 self.assertNotEqual(self.validate_after_report(count=count).returncode, 0)
 

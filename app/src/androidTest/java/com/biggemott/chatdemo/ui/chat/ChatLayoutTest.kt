@@ -1,7 +1,10 @@
 package com.biggemott.chatdemo.ui.chat
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -125,11 +128,11 @@ class ChatLayoutTest {
     }
 
     @Test
-    fun veryShortViewportKeepsAReadableComposerAndFullSendTarget() {
+    fun veryShortViewportKeepsTheComposerAndFullActionTargets() {
         var state by mutableStateOf(seededPreviewChat().copy(draft = PREVIEW_TALL_DRAFT))
         compose.setContent {
             ChatDemoTheme {
-                Box(Modifier.height(165.dp)) {
+                Box(Modifier.windowInsetsPadding(WindowInsets.safeDrawing).height(165.dp)) {
                     ChatScreen(state, actions = ChatActions(onSend = {}))
                 }
             }
@@ -137,6 +140,11 @@ class ChatLayoutTest {
         assertReadableComposer()
         compose.runOnIdle { state = state.copy(sendError = true, canRecoverDraft = true) }
         assertReadableComposer()
+        compose.runOnIdle { state = state.copy(history = ChatHistory.Unavailable) }
+        assertReadableComposer()
+        val retry = boundsOf("Retry")
+        val minTouchHeight = with(compose.density) { 48.dp.roundToPx() }
+        assertTrue("Retry keeps its 48 dp height alongside a held send error", retry.height >= minTouchHeight - 0.5f)
     }
 
     private fun assertReadableComposer() {

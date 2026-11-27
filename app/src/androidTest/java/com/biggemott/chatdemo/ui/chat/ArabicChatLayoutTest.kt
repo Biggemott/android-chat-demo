@@ -171,7 +171,11 @@ class ArabicChatLayoutTest {
                             }
                         SideEffect { readableFieldHeight = minHeight }
                         Box(Modifier.size(width = 320.dp, height = 81.dp)) {
-                            ChatComposer(draft = PREVIEW_ARABIC_DRAFT, onDraftChanged = {}, onSend = {})
+                            ChatComposer(
+                                state = emptyPreviewChat.copy(draft = PREVIEW_ARABIC_DRAFT),
+                                onDraftChanged = {},
+                                onSend = {},
+                            )
                         }
                     }
                 }

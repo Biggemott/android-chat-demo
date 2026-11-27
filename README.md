@@ -13,7 +13,7 @@ These screenshots render the app's Compose UI using its screenshot test fixtures
 
 ## Features
 
-- **Conversation history.** The chat opens at the latest message, groups consecutive messages from the same sender less than 20 seconds apart, and starts a new time section after a gap longer than one hour.
+- **Conversation history.** The chat opens at the latest message, groups consecutive messages from the same sender less than 20 seconds apart, and starts a new time section after a gap longer than one hour. If history fails to load, **Retry** reloads the conversation while keeping the draft.
 - **Multiline composer.** Drafts are saved locally. A failed send can restore the original text or offer it for recovery while preserving newer edits.
 - **Scripted replies.** The other participant shows a typing indicator and replies after a random delay of one to three seconds. Each successful send replaces any reply still waiting to write, so a burst of quick sends typically gets one reply.
 - **Scroll behavior.** New content follows the latest message when you are near the bottom. When you browse older messages, incoming replies preserve your reading position and a button takes you back to the latest message.
@@ -75,4 +75,4 @@ The [engineering guide](docs/engineering.md#runtime-checks) describes additional
 
 ## Engineering documentation
 
-See the [engineering guide](docs/engineering.md) for the Room schema, reply scheduling, draft recovery, scroll rules, toolchain pins, and reproducible verification commands.
+See the [engineering guide](docs/engineering.md) for the Room schema, history retry, reply scheduling, draft recovery, scroll rules, toolchain pins, and reproducible verification commands.

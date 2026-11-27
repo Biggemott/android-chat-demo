@@ -21,7 +21,9 @@ Room creates both users, their conversation and memberships, and eight historica
 
 Android-independent domain models use inline value classes for user, conversation, and message IDs. The repository supplies the fixed conversation and participants through `demoChat`. Its `observeMessages(conversationId)` exposes a Room-backed `Flow<List<Message>>`. The suspending `sendMessage(NewMessage)` accepts nonblank text from either participant, timestamps it with the injected UTC clock, and returns the stored message with its generated ID and `Instant`. Storage failures propagate to the caller.
 
-The Hilt-injected `ChatViewModel` collects one history flow for its lifetime and maps each emission with a pure Kotlin mapper. Its read-only `StateFlow` also carries the draft, typing state, and scroll request. Compose collects it with lifecycle awareness and shows loading, empty, populated, or unavailable history. Draft and typing changes reuse the mapped timeline. Visible messages come from the Room observation after persistence.
+The Hilt-injected `ChatViewModel` starts one history observation and maps each emission with a pure Kotlin mapper. Its read-only `StateFlow` also carries the draft, typing state, and scroll request. Compose collects it with lifecycle awareness and shows loading, empty, populated, or unavailable history. Draft and typing changes reuse the mapped timeline. Visible messages come from the Room observation after persistence.
+
+If observation fails before or after an emission, the unavailable state replaces the history pane and keeps the draft editable. **Retry** switches to loading and starts a fresh observation of the same conversation. Taps during loading or after recovery have no effect. Sending resumes after an empty or populated result. Another failure makes Retry available again. Cancellation ends observation without publishing a history error. In a short window the editor and Retry take priority over the send-error banner, which returns when space permits.
 
 ### Draft persistence and recovery
 
@@ -82,7 +84,7 @@ Run from the repository root. On macOS or Linux use `./gradlew` instead of `.\gr
 .\gradlew.bat :app:assembleRelease
 ```
 
-The fast gate checks formatting without editing source files. JVM tests cover timeline boundaries, stable keys, localized timestamps, and ViewModel transitions. Virtual time exercises draft races, rapid sends, failure recovery, deadline ordering, reply replacement across locales, script cycling, and cancellation.
+The fast gate checks formatting without editing source files. JVM tests cover timeline boundaries, stable keys, localized timestamps, and ViewModel transitions. Virtual time exercises draft races, history retries, rapid sends, failure recovery, deadline ordering, reply replacement across locales, script cycling, and cancellation.
 
 The [screenshot baselines](../app/src/test/screenshots) use native graphics and fixed API 35 device, locale, theme, font scale, and UTC time inputs per fixture. The parity check compared decoded pixels on Windows with JBR 25.0.4 and Ubuntu 24.04 with Temurin 25.0.5.1+2. Private Compose previews sit beside their components and share fixtures. Run `./gradlew :app:recordRoborazziDebug` for an intentional visual change and inspect the images before committing them. The verification task compares the rendered UI against the tracked baselines.
 
@@ -108,7 +110,7 @@ py -3 .github/scripts/validate_connected.py $results $env:ANDROID_SERIAL
 if ($LASTEXITCODE -ne 0) { throw "Connected result validation failed" }
 ```
 
-On Linux, set `ANDROID_SERIAL` and `EXPECTED_ANDROID_API`, and set `EXPECTED_ANDROID_PAGE_SIZE=16384` for API 37 to match CI. Run `bash .github/scripts/run-connected.sh` with Python 3 available. The validator checks fresh XML for the selected device, at least 35 distinct executed cases, and zero failures, errors, or skips. An APK installation failure can otherwise leave Gradle returning success with zero executed cases.
+On Linux, set `ANDROID_SERIAL` and `EXPECTED_ANDROID_API`, and set `EXPECTED_ANDROID_PAGE_SIZE=16384` for API 37 to match CI. Run `bash .github/scripts/run-connected.sh` with Python 3 available. The validator checks fresh XML for the selected device, at least 36 distinct executed cases, and zero failures, errors, or skips. An APK installation failure can otherwise leave Gradle returning success with zero executed cases.
 
 Both GitHub Actions workflows run on pushes and pull requests and support manual runs. Fast checks uses Ubuntu 24.04 and Temurin JDK 25 and uploads JVM XML. Instrumentation runs one job per API and reports the validated counts in the job log. Both upload failure diagnostics. [Fast checks workflow](../.github/workflows/fast.yml) · [Instrumentation workflow](../.github/workflows/instrumentation.yml)
 
@@ -142,7 +144,7 @@ On first use or after an upgrade, verify a known diagnostic. In `ReplyDelay.kt`,
 ## Storage and layout limits
 
 - Room loads the full conversation and the ViewModel maps it on history emissions. There is no pagination. Exceptionally large individual messages can exceed Android database cursor or rendering limits.
-- Timestamps use wall-clock milliseconds with generated IDs as tie-breakers. If history observation fails, the app keeps the draft and shows an unavailable state. Observation restarts when a new ViewModel is created.
+- Timestamps use wall-clock milliseconds with generated IDs as tie-breakers.
 - Room and DataStore write independently. Process death before a draft edit or clear reaches disk can restore an earlier value, including submitted text if Room committed first. A completed clear can also precede an interrupted Room write. Held failed drafts, pending replies, and the script position are in memory for the lifetime of the ViewModel.
 - Android Auto Backup is disabled. Backup rules exclude the database directory and `files/datastore/` from legacy backup, cloud backup, and device transfer where Android applies the rules. Device manufacturers can handle transfer differently. [Android backup behavior](https://developer.android.com/identity/data/autobackup)
 - Scroll restoration saves the list index and offset. An insertion or removal before the first measure can shift the restored anchor by a row. The floating latest-message button can cover part of a bubble in short viewports.

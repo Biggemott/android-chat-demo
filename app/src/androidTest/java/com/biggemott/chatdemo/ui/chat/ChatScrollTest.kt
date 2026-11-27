@@ -199,8 +199,8 @@ class ChatScrollTest {
             ChatDemoTheme {
                 Box(Modifier.height(height)) {
                     ChatHistoryPane(
-                        history = state.history,
-                        chat = chat,
+                        state = state,
+                        onRetryHistory = {},
                         zoneId = "UTC",
                         scroll = rememberChatScroll(list, state.outgoingScrollKey) { state = state.copy(outgoingScrollKey = null) },
                         typing = Typing.Static.takeIf { state.isReplyPending },

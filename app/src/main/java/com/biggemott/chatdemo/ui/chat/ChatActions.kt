@@ -6,4 +6,5 @@ internal class ChatActions(
     val onRecoverDraft: () -> Unit = {},
     val onOutgoingScrolled: (String) -> Unit = {},
     val onBack: () -> Unit = {},
+    val onRetryHistory: () -> Unit = {},
 )

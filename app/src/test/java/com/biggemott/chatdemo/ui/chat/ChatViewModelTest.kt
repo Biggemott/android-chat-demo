@@ -15,6 +15,7 @@ import com.biggemott.chatdemo.domain.NewMessage
 import com.biggemott.chatdemo.domain.User
 import com.biggemott.chatdemo.domain.UserId
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.awaitCancellation
@@ -35,6 +36,7 @@ import org.junit.Before
 import org.junit.Test
 import java.io.IOException
 import java.time.Instant
+import java.util.Locale
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class ChatViewModelTest {
@@ -112,15 +114,104 @@ class ChatViewModelTest {
         }
 
     @Test
-    fun observationFailurePublishesAnErrorAndKeepsTheDraft() =
+    fun retriesInitialFailureWithoutLosingTheDraftOrAcceptingSendsBeforeRecovery() =
         runTest {
-            val viewModel = viewModel { flow { throw IOException("Cannot read messages") } }
-            viewModel.onDraftChanged("Keep this")
+            val result = CompletableDeferred<List<Message>>()
+            val sent = mutableListOf<NewMessage>()
+            var attempts = 0
+            var activeCollectors = 0
+            val viewModel =
+                viewModel(onSend = sent::add) {
+                    val attempt = ++attempts
+                    flow {
+                        activeCollectors++
+                        try {
+                            assertEquals(1, activeCollectors)
+                            if (attempt == 1) throw IOException("Cannot read messages")
+                            emit(result.await())
+                            awaitCancellation()
+                        } finally {
+                            activeCollectors--
+                        }
+                    }
+                }
+            val draft = "  Keep this\nمرحبا "
+            viewModel.onDraftChanged(draft)
 
             runCurrent()
-
             assertEquals(ChatHistory.Unavailable, viewModel.uiState.value.history)
-            assertEquals("Keep this", viewModel.uiState.value.draft)
+            assertEquals(1, attempts)
+            assertEquals(0, activeCollectors)
+            assertFalse(viewModel.uiState.value.canSend)
+            viewModel.onSend(Locale.US)
+            assertEquals(draft, viewModel.uiState.value.draft)
+
+            viewModel.onRetryHistory()
+            viewModel.onRetryHistory()
+            assertEquals(ChatHistory.Loading, viewModel.uiState.value.history)
+            assertFalse(viewModel.uiState.value.canSend)
+            viewModel.onSend(Locale.US)
+            assertEquals(draft, viewModel.uiState.value.draft)
+            runCurrent()
+            viewModel.onRetryHistory()
+            runCurrent()
+            assertEquals(2, attempts)
+            assertEquals(1, activeCollectors)
+            assertTrue(sent.isEmpty())
+
+            result.complete(listOf(first))
+            runCurrent()
+            assertEquals(ChatHistory.Content(mapChatTimeline(listOf(first), demoChat.currentUser.id)), viewModel.uiState.value.history)
+            assertEquals(draft, viewModel.uiState.value.draft)
+            assertTrue(viewModel.uiState.value.canSend)
+            viewModel.onRetryHistory()
+            viewModel.onSend(Locale.US)
+            runCurrent()
+            assertEquals(2, attempts)
+            assertEquals(listOf(NewMessage(demoChat.conversation.id, demoChat.currentUser.id, draft.trim())), sent)
+        }
+
+    @Test
+    fun retriesAfterContentFailsAndCanRecoverEmptyHistoryAfterASecondFailure() =
+        runTest {
+            val failAfterContent = CompletableDeferred<Unit>()
+            var attempts = 0
+            val viewModel =
+                viewModel {
+                    when (++attempts) {
+                        1 -> {
+                            flow {
+                                emit(listOf(first))
+                                failAfterContent.await()
+                                throw IOException("Lost history")
+                            }
+                        }
+
+                        2 -> {
+                            throw IOException("Cannot reopen history")
+                        }
+
+                        else -> {
+                            flow { emit(emptyList()) }
+                        }
+                    }
+                }
+            runCurrent()
+            assertTrue(viewModel.uiState.value.history is ChatHistory.Content)
+            failAfterContent.complete(Unit)
+            runCurrent()
+            assertEquals(ChatHistory.Unavailable, viewModel.uiState.value.history)
+            assertEquals(1, attempts)
+
+            viewModel.onRetryHistory()
+            runCurrent()
+            assertEquals(ChatHistory.Unavailable, viewModel.uiState.value.history)
+            assertEquals(2, attempts)
+
+            viewModel.onRetryHistory()
+            runCurrent()
+            assertEquals(ChatHistory.Content(emptyList()), viewModel.uiState.value.history)
+            assertEquals(3, attempts)
         }
 
     @Test
@@ -152,15 +243,17 @@ class ChatViewModelTest {
         }
 
     @Test
-    fun clearingTheViewModelCancelsObservation() =
+    fun clearingTheViewModelCancelsARetryWithoutPublishingAnErrorOrRestarting() =
         runTest {
+            var attempts = 0
             var observing = false
             val viewModel =
                 viewModel {
+                    val attempt = ++attempts
                     flow {
+                        if (attempt == 1) throw IOException("Cannot read messages")
                         observing = true
                         try {
-                            emit(emptyList())
                             awaitCancellation()
                         } finally {
                             observing = false
@@ -168,16 +261,22 @@ class ChatViewModelTest {
                     }
                 }
             runCurrent()
+            viewModel.onRetryHistory()
+            runCurrent()
             assertTrue(observing)
 
             store.clear()
             runCurrent()
 
             assertFalse(observing)
-            assertEquals(ChatHistory.Content(emptyList()), viewModel.uiState.value.history)
+            assertEquals(ChatHistory.Loading, viewModel.uiState.value.history)
+            assertEquals(2, attempts)
         }
 
-    private fun viewModel(observe: () -> Flow<List<Message>>): ChatViewModel {
+    private fun viewModel(
+        onSend: (NewMessage) -> Unit = { error("Unexpected send") },
+        observe: () -> Flow<List<Message>>,
+    ): ChatViewModel {
         val repository =
             object : ChatRepository {
                 override val demoChat = this@ChatViewModelTest.demoChat
@@ -187,7 +286,10 @@ class ChatViewModelTest {
                     return observe()
                 }
 
-                override suspend fun sendMessage(message: NewMessage): Message = error("Presentation must not send messages")
+                override suspend fun sendMessage(message: NewMessage): Message {
+                    onSend(message)
+                    throw IOException("Test send attempt")
+                }
             }
         val draftStore =
             object : DraftStore {

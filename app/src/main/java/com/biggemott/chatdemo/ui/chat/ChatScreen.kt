@@ -61,6 +61,7 @@ internal fun ChatRoute(
                 viewModel::onRecoverDraft,
                 viewModel::onOutgoingScrolled,
                 onBack,
+                onRetryHistory = viewModel::onRetryHistory,
             )
         }
     ChatScreen(state, actions)
@@ -85,8 +86,8 @@ internal fun ChatScreen(
                 ChatHeader(state.chat.otherUser.displayName, actions.onBack)
                 Box(Modifier.weight(1f)) {
                     ChatHistoryPane(
-                        history = state.history,
-                        chat = state.chat,
+                        state = state,
+                        onRetryHistory = actions.onRetryHistory,
                         zoneId = zone.id,
                         scroll = rememberChatScroll(listState, state.outgoingScrollKey, actions.onOutgoingScrolled),
                         typing =
@@ -100,10 +101,9 @@ internal fun ChatScreen(
                 }
             }
             ChatComposer(
-                draft = state.draft,
+                state = state,
                 onDraftChanged = actions.onDraftChanged,
                 onSend = actions.onSend?.takeIf { state.canSend },
-                sendError = state.sendError,
                 onRecoverDraft = actions.onRecoverDraft.takeIf { state.canRecoverDraft },
             )
         }
